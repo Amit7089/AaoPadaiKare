@@ -1,6 +1,7 @@
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+).replace(/\/+$/, "");
 
 // ==============================
 // ADMIN TOKEN
@@ -51,17 +52,29 @@ async function request(endpoint, options = {}, authType = "none") {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    console.error("API connection error:", error);
+
+    throw new Error(
+      "Backend se connection nahi ho pa raha. Internet ya server connection check karein."
+    );
+  }
 
   let result;
 
   try {
     result = await response.json();
   } catch {
-    throw new Error("Invalid server response");
+    throw new Error(
+      "Server se valid response nahi mila. Please try again."
+    );
   }
 
   if (!response.ok) {
@@ -75,7 +88,9 @@ async function request(endpoint, options = {}, authType = "none") {
       }
     }
 
-    throw new Error(result.message || "Something went wrong");
+    throw new Error(
+      result.message || `Request failed with status ${response.status}`
+    );
   }
 
   return result;
