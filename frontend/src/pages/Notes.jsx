@@ -17,6 +17,7 @@ import {
   Layers3,
   X,
   Home,
+  ExternalLink,
 } from "lucide-react";
 
 import { api } from "../services/api";
@@ -27,14 +28,27 @@ const BACKEND_URL = (
 
 const CLASSES = [6, 7, 8, 9, 10, 11, 12];
 
+// PDF URL helper
+const getPdfUrl = (pdfUrl) => {
+  if (!pdfUrl) return "";
+
+  // Cloudinary ya kisi bhi external URL ko directly return karega
+  if (/^https?:\/\//i.test(pdfUrl)) {
+    return pdfUrl;
+  }
+
+  // Local backend URL ke liye
+  return `${BACKEND_URL.replace(/\/$/, "")}/${pdfUrl.replace(/^\//, "")}`;
+};
+
+// Note count helper
 const getNoteCount = (notes, classNo, subject, chapter) => {
-  return notes.filter((note) => {
-    return (
+  return notes.filter(
+    (note) =>
       Number(note.classNo) === Number(classNo) &&
       note.subject === subject &&
       note.chapter === chapter
-    );
-  }).length;
+  ).length;
 };
 
 export default function Notes() {
@@ -90,6 +104,7 @@ export default function Notes() {
         setChapters(syllabusData);
         setNotes(notesData);
       } catch (err) {
+        console.error("Notes loading error:", err);
         setError(err.message || "Notes load nahi ho paye.");
       } finally {
         setLoading(false);
@@ -104,15 +119,11 @@ export default function Notes() {
     if (!classNo) return [];
 
     const syllabusSubjects = chapters
-      .filter(
-        (item) => Number(item.classNo) === Number(classNo)
-      )
+      .filter((item) => Number(item.classNo) === Number(classNo))
       .map((item) => item.subject);
 
     const noteSubjects = notes
-      .filter(
-        (item) => Number(item.classNo) === Number(classNo)
-      )
+      .filter((item) => Number(item.classNo) === Number(classNo))
       .map((item) => item.subject);
 
     return [...new Set([...syllabusSubjects, ...noteSubjects])]
@@ -142,10 +153,12 @@ export default function Notes() {
 
     return [...new Set([...syllabusChapters, ...noteChapters])]
       .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b, undefined, {
-        numeric: true,
-        sensitivity: "base",
-      }));
+      .sort((a, b) =>
+        a.localeCompare(b, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        })
+      );
   }, [chapters, notes, classNo, subject]);
 
   // Notes for selected chapter
@@ -255,92 +268,97 @@ export default function Notes() {
   const isSearching = search.trim().length > 0;
 
   // Note card
-  const NoteCard = ({ note }) => (
-    <article
-      key={note._id}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl"
-    >
-      <div className="p-5 sm:p-6">
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
-            <BookOpen size={25} />
+  const NoteCard = ({ note }) => {
+    const pdfUrl = getPdfUrl(note.pdfUrl);
+
+    return (
+      <article
+        key={note._id}
+        className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl"
+      >
+        <div className="p-5 sm:p-6">
+          <div className="mb-5 flex items-start justify-between gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
+              <BookOpen size={25} />
+            </div>
+
+            {note.isPremium ? (
+              <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+                Premium
+              </span>
+            ) : (
+              <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+                Free
+              </span>
+            )}
           </div>
 
-          {note.isPremium ? (
-            <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
-              Premium
+          <div className="mb-4 flex flex-wrap gap-2">
+            <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+              Class {note.classNo}
             </span>
-          ) : (
-            <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
-              Free
+
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              {note.subject}
             </span>
-          )}
-        </div>
+          </div>
 
-        <div className="mb-4 flex flex-wrap gap-2">
-          <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
-            Class {note.classNo}
-          </span>
+          <h3 className="line-clamp-2 min-h-[3.5rem] text-lg font-extrabold leading-7 text-slate-900">
+            {note.title}
+          </h3>
 
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-            {note.subject}
-          </span>
-        </div>
-
-        <h3 className="line-clamp-2 min-h-[3.5rem] text-lg font-extrabold leading-7 text-slate-900">
-          {note.title}
-        </h3>
-
-        <p className="mt-2 text-sm font-medium text-indigo-600">
-          {note.chapter}
-        </p>
-
-        <div className="mt-4 min-h-[6rem]">
-          {note.content ? (
-            <p className="line-clamp-4 whitespace-pre-line text-sm leading-6 text-slate-600">
-              {note.content}
-            </p>
-          ) : (
-            <p className="text-sm italic text-slate-400">
-              PDF study material available.
-            </p>
-          )}
-        </div>
-
-        {note.pdfName && (
-          <p className="mt-3 flex items-center gap-2 break-all text-xs text-slate-500">
-            <FileText size={15} />
-            {note.pdfName}
+          <p className="mt-2 text-sm font-medium text-indigo-600">
+            {note.chapter}
           </p>
-        )}
-      </div>
 
-      <div className="mt-auto border-t border-slate-100 bg-slate-50/70 p-5">
-        <div className="flex flex-col gap-3">
-          <Link
-            to={`/notes/${note._id}`}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
-          >
-            <BookMarked size={17} />
-            Read Full Notes
-            <ArrowRight size={16} />
-          </Link>
+          <div className="mt-4 min-h-[6rem]">
+            {note.content ? (
+              <p className="line-clamp-4 whitespace-pre-line text-sm leading-6 text-slate-600">
+                {note.content}
+              </p>
+            ) : (
+              <p className="text-sm italic text-slate-400">
+                PDF study material available.
+              </p>
+            )}
+          </div>
 
-          {note.pdfUrl && (
-            <a
-              href={`${BACKEND_URL}${note.pdfUrl}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600"
-            >
-              <Download size={17} />
-              View / Download PDF
-            </a>
+          {note.pdfName && (
+            <p className="mt-3 flex items-center gap-2 break-all text-xs text-slate-500">
+              <FileText size={15} className="shrink-0" />
+              {note.pdfName}
+            </p>
           )}
         </div>
-      </div>
-    </article>
-  );
+
+        <div className="mt-auto border-t border-slate-100 bg-slate-50/70 p-5">
+          <div className="flex flex-col gap-3">
+            <Link
+              to={`/notes/${note._id}`}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
+            >
+              <BookMarked size={17} />
+              Read Full Notes
+              <ArrowRight size={16} />
+            </Link>
+
+            {pdfUrl && (
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600"
+              >
+                <Download size={17} />
+                View / Download PDF
+                <ExternalLink size={15} />
+              </a>
+            )}
+          </div>
+        </div>
+      </article>
+    );
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:py-12">
@@ -413,7 +431,9 @@ export default function Notes() {
               type="button"
               onClick={resetFilters}
               className={`flex items-center gap-1 font-semibold ${
-                !classNo ? "text-indigo-700" : "text-slate-500 hover:text-indigo-600"
+                !classNo
+                  ? "text-indigo-700"
+                  : "text-slate-500 hover:text-indigo-600"
               }`}
             >
               <Home size={15} />
@@ -431,7 +451,9 @@ export default function Notes() {
                     setChapter("");
                   }}
                   className={`font-semibold ${
-                    !subject ? "text-indigo-700" : "text-slate-500 hover:text-indigo-600"
+                    !subject
+                      ? "text-indigo-700"
+                      : "text-slate-500 hover:text-indigo-600"
                   }`}
                 >
                   Class {classNo}
@@ -447,7 +469,9 @@ export default function Notes() {
                   type="button"
                   onClick={() => setChapter("")}
                   className={`font-semibold ${
-                    !chapter ? "text-indigo-700" : "text-slate-500 hover:text-indigo-600"
+                    !chapter
+                      ? "text-indigo-700"
+                      : "text-slate-500 hover:text-indigo-600"
                   }`}
                 >
                   {subject}
@@ -485,15 +509,7 @@ export default function Notes() {
             </div>
 
             {searchResults.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-16 text-center">
-                <FileText className="mx-auto mb-4 text-slate-400" size={45} />
-                <h2 className="text-xl font-bold text-slate-800">
-                  No Notes Found
-                </h2>
-                <p className="mt-2 text-sm text-slate-500">
-                  Try another title, subject or chapter.
-                </p>
-              </div>
+              <EmptyState message="Try another title, subject or chapter." />
             ) : (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {searchResults.map((note) => (
@@ -516,7 +532,7 @@ export default function Notes() {
               </button>
             )}
 
-            {/* Loading */}
+            {/* Loading / Error / Content */}
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <LoaderCircle
@@ -589,9 +605,11 @@ export default function Notes() {
                       <p className="text-sm font-semibold text-indigo-600">
                         Class {classNo}
                       </p>
+
                       <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
                         Select Subject
                       </h2>
+
                       <p className="mt-2 text-sm text-slate-500">
                         Choose a subject to view its chapters.
                       </p>
@@ -639,9 +657,11 @@ export default function Notes() {
                       <p className="text-sm font-semibold text-indigo-600">
                         Class {classNo} / {subject}
                       </p>
+
                       <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
                         Select Chapter
                       </h2>
+
                       <p className="mt-2 text-sm text-slate-500">
                         Choose a chapter to view its study notes.
                       </p>
@@ -674,9 +694,11 @@ export default function Notes() {
                                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                                   Chapter {index + 1}
                                 </p>
+
                                 <h3 className="mt-1 font-extrabold text-slate-900">
                                   {item}
                                 </h3>
+
                                 <p className="mt-1 text-xs text-slate-500">
                                   {count} Notes Available
                                 </p>
@@ -702,9 +724,11 @@ export default function Notes() {
                         <p className="text-sm font-semibold text-indigo-600">
                           Class {classNo} / {subject}
                         </p>
+
                         <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
                           {chapter}
                         </h2>
+
                         <p className="mt-2 text-sm text-slate-500">
                           Study material for this chapter.
                         </p>
@@ -748,9 +772,11 @@ function EmptyState({ message }) {
         className="mx-auto mb-4 text-slate-400"
         size={45}
       />
+
       <h3 className="text-lg font-bold text-slate-800">
         No Content Available
       </h3>
+
       <p className="mt-2 text-sm text-slate-500">
         {message}
       </p>

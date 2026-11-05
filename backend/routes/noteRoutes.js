@@ -1,34 +1,68 @@
 
 import express from "express";
-import fs from "fs";
-import path from "path";
 
+import cloudinary from "../config/cloudinary.js";
 import Note from "../models/Note.js";
 import upload from "../middleware/upload.js";
 import adminAuth from "../middleware/adminAuth.js";
 
 const router = express.Router();
 
-// Helper: Delete uploaded PDF safely
-const deletePdfFile = (pdfUrl) => {
-  if (!pdfUrl) return;
-
-  const filename = path.basename(pdfUrl);
-  const filePath = path.join(process.cwd(), "uploads", filename);
-
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-  }
+// Original filename
+const getOriginalFileName = (file) => {
+  return file?.originalname || "";
 };
 
-// Helper: Remove newly uploaded PDF if request fails
-const removeUploadedFile = (file) => {
-  if (file?.path && fs.existsSync(file.path)) {
-    fs.unlinkSync(file.path);
-  }
+// Upload PDF to Cloudinary for browser preview
+const uploadPdfToCloudinary = (file) => {
+  return new Promise((resolve, reject) => {
+    if (!file?.buffer) {
+      return reject(new Error("PDF file buffer is missing"));
+    }
+
+    const uniqueName = `note-${Date.now()}-${Math.round(
+      Math.random() * 1e9
+    )}`;
+
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "aao-padai-kare/notes",
+        public_id: uniqueName,
+        resource_type: "image",
+        format: "pdf",
+      },
+      (error, result) => {
+        if (error) {
+          console.error("Cloudinary PDF upload error:", error);
+          return reject(error);
+        }
+
+        if (!result?.secure_url || !result?.public_id) {
+          return reject(new Error("Cloudinary PDF URL was not returned"));
+        }
+
+        resolve(result);
+      }
+    );
+
+    stream.end(file.buffer);
+  });
 };
 
-// Helper: Validate YouTube URL
+// Delete PDF from Cloudinary
+const deleteCloudinaryPdf = async (
+  publicId,
+  resourceType = "raw"
+) => {
+  if (!publicId) return;
+
+  return cloudinary.uploader.destroy(publicId, {
+    resource_type: resourceType,
+    type: "upload",
+  });
+};
+
+// Validate YouTube URL
 const isValidYouTubeUrl = (url) => {
   if (!url) return true;
 
@@ -36,15 +70,62 @@ const isValidYouTubeUrl = (url) => {
     const parsedUrl = new URL(url);
 
     return (
-      ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"].includes(parsedUrl.hostname) &&
-      (parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:")
+      [
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+        "youtu.be",
+        "www.youtu.be",
+      ].includes(parsedUrl.hostname) &&
+      ["https:", "http:"].includes(parsedUrl.protocol)
     );
   } catch {
     return false;
   }
 };
 
-// GET: All notes - Public
+// Validate note fields
+const validateNoteFields = (body) => {
+  const {
+    classNo,
+    subject,
+    chapter,
+    title,
+    youtubeUrl,
+  } = body;
+
+  const numericClass = Number(classNo);
+  const videoUrl = youtubeUrl?.trim() || "";
+
+  if (
+    !Number.isInteger(numericClass) ||
+    numericClass < 6 ||
+    numericClass > 12 ||
+    !subject?.trim() ||
+    !chapter?.trim() ||
+    !title?.trim()
+  ) {
+    return {
+      valid: false,
+      message: "Valid class, subject, chapter and title are required",
+    };
+  }
+
+  if (!isValidYouTubeUrl(videoUrl)) {
+    return {
+      valid: false,
+      message: "Please enter a valid YouTube video URL",
+    };
+  }
+
+  return {
+    valid: true,
+    numericClass,
+    videoUrl,
+  };
+};
+
+// GET: All notes
 router.get("/", async (req, res) => {
   try {
     const filter = {};
@@ -78,28 +159,32 @@ router.get("/", async (req, res) => {
       createdAt: -1,
     });
 
-    res.json({
+    return res.json({
       success: true,
       count: notes.length,
       data: notes,
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("Get notes error:", error);
+
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 });
 
-// POST: Add note - Admin only
+// POST: Add note
 router.post("/", adminAuth, (req, res) => {
-  upload.single("pdf")(req, res, async (error) => {
-    if (error) {
+  upload.single("pdf")(req, res, async (uploadError) => {
+    if (uploadError) {
       return res.status(400).json({
         success: false,
-        message: error.message,
+        message: uploadError.message,
       });
     }
+
+    let uploadedPdf = null;
 
     try {
       const {
@@ -108,36 +193,15 @@ router.post("/", adminAuth, (req, res) => {
         chapter,
         title,
         content,
-        youtubeUrl,
         isPremium,
       } = req.body;
 
-      const numericClass = Number(classNo);
-      const videoUrl = youtubeUrl?.trim() || "";
+      const validation = validateNoteFields(req.body);
 
-      if (
-        !Number.isInteger(numericClass) ||
-        numericClass < 6 ||
-        numericClass > 12 ||
-        !subject?.trim() ||
-        !chapter?.trim() ||
-        !title?.trim()
-      ) {
-        removeUploadedFile(req.file);
-
+      if (!validation.valid) {
         return res.status(400).json({
           success: false,
-          message:
-            "Valid class, subject, chapter and title are required",
-        });
-      }
-
-      if (!isValidYouTubeUrl(videoUrl)) {
-        removeUploadedFile(req.file);
-
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid YouTube video URL",
+          message: validation.message,
         });
       }
 
@@ -148,56 +212,64 @@ router.post("/", adminAuth, (req, res) => {
         });
       }
 
+      if (req.file) {
+        uploadedPdf = await uploadPdfToCloudinary(req.file);
+      }
+
       const note = await Note.create({
-        classNo: numericClass,
+        classNo: validation.numericClass,
         subject: subject.trim(),
         chapter: chapter.trim(),
         title: title.trim(),
         content: content || "",
-        pdfUrl: req.file
-          ? `/uploads/${req.file.filename}`
-          : "",
-        pdfName: req.file
-          ? req.file.originalname
-          : "",
-        youtubeUrl: videoUrl,
+        pdfUrl: uploadedPdf?.secure_url || "",
+        pdfName: getOriginalFileName(req.file),
+        pdfPublicId: uploadedPdf?.public_id || "",
+        pdfResourceType: uploadedPdf ? "image" : "raw",
+        youtubeUrl: validation.videoUrl,
         isPremium: isPremium === "true",
       });
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         message: "Note added successfully",
         data: note,
       });
     } catch (error) {
-      removeUploadedFile(req.file);
+      console.error("Add note error:", error);
 
-      res.status(500).json({
+      if (uploadedPdf?.public_id) {
+        try {
+          await deleteCloudinaryPdf(uploadedPdf.public_id, "image");
+        } catch (deleteError) {
+          console.error("PDF cleanup error:", deleteError);
+        }
+      }
+
+      return res.status(500).json({
         success: false,
-        message: error.message,
+        message: error.message || "Failed to add note",
       });
     }
   });
 });
 
-// PUT: Update note - Admin only
+// PUT: Update note
 router.put("/:id", adminAuth, (req, res) => {
-  upload.single("pdf")(req, res, async (error) => {
-    if (error) {
+  upload.single("pdf")(req, res, async (uploadError) => {
+    if (uploadError) {
       return res.status(400).json({
         success: false,
-        message: error.message,
+        message: uploadError.message,
       });
     }
 
-    let oldPdfUrl = "";
+    let uploadedPdf = null;
 
     try {
       const note = await Note.findById(req.params.id);
 
       if (!note) {
-        removeUploadedFile(req.file);
-
         return res.status(404).json({
           success: false,
           message: "Note not found",
@@ -210,101 +282,87 @@ router.put("/:id", adminAuth, (req, res) => {
         chapter,
         title,
         content,
-        youtubeUrl,
         isPremium,
       } = req.body;
 
-      const numericClass = Number(classNo);
-      const videoUrl = youtubeUrl?.trim() || "";
+      const validation = validateNoteFields(req.body);
 
-      // Validate fields
-      if (
-        !Number.isInteger(numericClass) ||
-        numericClass < 6 ||
-        numericClass > 12 ||
-        !subject?.trim() ||
-        !chapter?.trim() ||
-        !title?.trim()
-      ) {
-        removeUploadedFile(req.file);
-
+      if (!validation.valid) {
         return res.status(400).json({
           success: false,
-          message:
-            "Valid class, subject, chapter and title are required",
+          message: validation.message,
         });
       }
 
-      if (!isValidYouTubeUrl(videoUrl)) {
-        removeUploadedFile(req.file);
-
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid YouTube video URL",
-        });
-      }
-
-      // Keep existing PDF if no new PDF is uploaded
-      const hasPdf = req.file || note.pdfUrl;
-
-      if (!content?.trim() && !hasPdf) {
+      if (!content?.trim() && !req.file && !note.pdfUrl) {
         return res.status(400).json({
           success: false,
           message: "Please provide note text or a PDF file",
         });
       }
 
-      // Store old PDF URL for deletion after successful update
+      // Upload replacement PDF first
       if (req.file) {
-        oldPdfUrl = note.pdfUrl;
+        uploadedPdf = await uploadPdfToCloudinary(req.file);
       }
 
-      // Update note fields
-      note.classNo = numericClass;
+      const oldPdfPublicId = note.pdfPublicId;
+      const oldPdfResourceType = note.pdfResourceType || "raw";
+
+      note.classNo = validation.numericClass;
       note.subject = subject.trim();
       note.chapter = chapter.trim();
       note.title = title.trim();
       note.content = content || "";
-      note.youtubeUrl = videoUrl;
+      note.youtubeUrl = validation.videoUrl;
       note.isPremium = isPremium === "true";
 
-      // Replace PDF only if a new one is uploaded
-      if (req.file) {
-        note.pdfUrl = `/uploads/${req.file.filename}`;
-        note.pdfName = req.file.originalname;
+      if (uploadedPdf) {
+        note.pdfUrl = uploadedPdf.secure_url;
+        note.pdfName = getOriginalFileName(req.file);
+        note.pdfPublicId = uploadedPdf.public_id;
+        note.pdfResourceType = "image";
       }
 
       await note.save();
 
-      // Delete old PDF after successful database update
-      if (req.file && oldPdfUrl) {
+      // Delete previous PDF after successful save
+      if (uploadedPdf && oldPdfPublicId) {
         try {
-          deletePdfFile(oldPdfUrl);
-        } catch (fileError) {
-          console.error(
-            "Old PDF deletion failed:",
-            fileError.message
+          await deleteCloudinaryPdf(
+            oldPdfPublicId,
+            oldPdfResourceType
           );
+        } catch (deleteError) {
+          console.error("Old PDF deletion error:", deleteError);
         }
       }
 
-      res.json({
+      return res.json({
         success: true,
         message: "Note updated successfully",
         data: note,
       });
     } catch (error) {
-      removeUploadedFile(req.file);
+      console.error("Update note error:", error);
 
-      res.status(500).json({
+      if (uploadedPdf?.public_id) {
+        try {
+          await deleteCloudinaryPdf(uploadedPdf.public_id, "image");
+        } catch (deleteError) {
+          console.error("New PDF cleanup error:", deleteError);
+        }
+      }
+
+      return res.status(500).json({
         success: false,
-        message: error.message,
+        message: error.message || "Failed to update note",
       });
     }
   });
 });
 
-// DELETE: Delete note - Admin only
+// DELETE: Delete note
 router.delete("/:id", adminAuth, async (req, res) => {
   try {
     const note = await Note.findById(req.params.id);
@@ -316,27 +374,34 @@ router.delete("/:id", adminAuth, async (req, res) => {
       });
     }
 
-    if (note.pdfUrl) {
+    if (note.pdfPublicId) {
       try {
-        deletePdfFile(note.pdfUrl);
-      } catch (fileError) {
-        console.error(
-          "PDF deletion failed:",
-          fileError.message
+        await deleteCloudinaryPdf(
+          note.pdfPublicId,
+          note.pdfResourceType || "raw"
         );
+      } catch (deleteError) {
+        console.error("Cloudinary PDF deletion error:", deleteError);
+
+        return res.status(500).json({
+          success: false,
+          message: "PDF could not be deleted from Cloudinary",
+        });
       }
     }
 
     await note.deleteOne();
 
-    res.json({
+    return res.json({
       success: true,
       message: "Note deleted successfully",
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("Delete note error:", error);
+
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to delete note",
     });
   }
 });

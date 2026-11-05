@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 
 const noteSchema = new mongoose.Schema(
@@ -36,6 +35,14 @@ const noteSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    pdfPublicId: {
+      type: String,
+      default: "",
+    },
+    pdfResourceType: {
+      type: String,
+      default: "raw",
+    },
     youtubeUrl: {
       type: String,
       default: "",
@@ -46,7 +53,7 @@ const noteSchema = new mongoose.Schema(
       default: false,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const Note = mongoose.model("Note", noteSchema);

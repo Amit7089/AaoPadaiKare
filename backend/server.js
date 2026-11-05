@@ -1,17 +1,14 @@
 
+import "dotenv/config";
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import mongoose from "mongoose";
-import path from "path";
 
 import syllabusRoutes from "./routes/syllabusRoutes.js";
 import noteRoutes from "./routes/noteRoutes.js";
 import adminAuthRoutes from "./routes/adminAuthRoutes.js";
 import studentAuthRoutes from "./routes/studentAuthRoutes.js";
-
-// Environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -23,17 +20,16 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
 ]
   .filter(Boolean)
-  .map((origin) => origin.replace(/\/$/, ""));
+  .map((origin) => origin.replace(/\/+$/, ""));
 
 // CORS configuration
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests without an origin (e.g. server-to-server)
     if (!origin) {
       return callback(null, true);
     }
 
-    const normalizedOrigin = origin.replace(/\/$/, "");
+    const normalizedOrigin = origin.replace(/\/+$/, "");
 
     if (allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
@@ -47,15 +43,10 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-// Apply CORS
 app.use(cors(corsOptions));
 
-// Body parsers
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
-
-// Uploaded PDF files
-app.use("/uploads", express.static(path.resolve("uploads")));
 
 // Health check
 app.get("/api/health", (req, res) => {
@@ -85,7 +76,7 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((error, req, res, next) => {
-  console.error("Server error:", error.message);
+  console.error("Server error:", error);
 
   res.status(500).json({
     success: false,
@@ -102,6 +93,12 @@ async function startServer() {
 
     if (!process.env.JWT_SECRET) {
       throw new Error("JWT_SECRET is missing in environment variables");
+    }
+
+    if (!process.env.CLOUDINARY_CLOUD_NAME ||
+        !process.env.CLOUDINARY_API_KEY ||
+        !process.env.CLOUDINARY_API_SECRET) {
+      throw new Error("Cloudinary environment variables are missing");
     }
 
     await mongoose.connect(process.env.MONGODB_URI);

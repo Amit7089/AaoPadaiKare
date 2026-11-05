@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+
 import {
   BookOpen,
   Eye,
@@ -10,12 +11,19 @@ import {
   LoaderCircle,
 } from "lucide-react";
 
-import { api, saveStudentToken } from "../services/api";
+import {
+  api,
+  saveAdminToken,
+  saveStudentToken,
+  clearAdminToken,
+  clearStudentToken,
+} from "../services/api";
 
 export default function Login() {
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -40,7 +48,10 @@ export default function Login() {
     setError("");
     setSuccess("");
 
-    if (!formData.email.trim() || !formData.password) {
+    const email = formData.email.trim().toLowerCase();
+    const password = formData.password;
+
+    if (!email || !password) {
       setError("Please email aur password enter karein.");
       return;
     }
@@ -48,22 +59,49 @@ export default function Login() {
     try {
       setLoading(true);
 
-      const response = await api.studentLogin({
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-      });
+      // First: Try Admin Login
+      try {
+        const adminResponse = await api.adminLogin({
+          email,
+          password,
+        });
 
-      if (!response?.token) {
-        throw new Error("Login token receive nahi hua. Dobara try karein.");
+        if (adminResponse?.success && adminResponse?.token) {
+          clearStudentToken();
+          saveAdminToken(adminResponse.token);
+
+          setSuccess("Admin login successful! Dashboard open ho raha hai...");
+
+          window.dispatchEvent(new Event("authChange"));
+
+          navigate("/admin/dashboard", { replace: true });
+          return;
+        }
+      } catch (adminError) {
+        // Admin login fail hone par Student login check hoga.
       }
 
-      saveStudentToken(response.token);
+      // Second: Try Student Login
+      const studentResponse = await api.studentLogin({
+        email,
+        password,
+      });
 
-      setSuccess("Login successful! Dashboard open ho raha hai...");
+      if (!studentResponse?.success || !studentResponse?.token) {
+        throw new Error(
+          "Invalid email or password. Please dobara check karein."
+        );
+      }
 
-      setTimeout(() => {
-        navigate("/student/dashboard", { replace: true });
-      }, 800);
+      clearAdminToken();
+      saveStudentToken(studentResponse.token);
+
+      setSuccess("Student login successful! Dashboard open ho raha hai...");
+
+      window.dispatchEvent(new Event("authChange"));
+
+      navigate("/student/dashboard", { replace: true });
+
     } catch (err) {
       setError(
         err.message || "Login nahi ho paya. Email aur password check karein."
@@ -76,12 +114,17 @@ export default function Login() {
   return (
     <main className="flex min-h-[75vh] items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-sky-50 px-4 py-12">
       <div className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl shadow-indigo-100 md:grid-cols-2">
+
+        {/* LEFT SECTION */}
         <section className="hidden flex-col justify-between bg-gradient-to-br from-indigo-700 to-blue-600 p-10 text-white md:flex lg:p-12">
           <Link to="/" className="flex items-center gap-3">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
               <BookOpen size={26} />
             </span>
-            <span className="text-xl font-black">Aao Padai Kare</span>
+
+            <span className="text-xl font-black">
+              Aao Padai Kare
+            </span>
           </Link>
 
           <div>
@@ -100,8 +143,10 @@ export default function Login() {
           </p>
         </section>
 
+        {/* RIGHT SECTION */}
         <section className="p-6 sm:p-10 lg:p-12">
           <div className="mx-auto max-w-md">
+
             <Link
               to="/"
               className="inline-flex items-center gap-2 text-sm font-bold text-indigo-700 hover:text-indigo-900"
@@ -115,7 +160,7 @@ export default function Login() {
             </h2>
 
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Apni learning journey continue karne ke liye sign in karein.
+              Admin ya Student account se sign in karein.
             </p>
 
             {error && (
@@ -137,6 +182,8 @@ export default function Login() {
             )}
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+
+              {/* EMAIL */}
               <div>
                 <label
                   htmlFor="email"
@@ -163,6 +210,7 @@ export default function Login() {
                 </div>
               </div>
 
+              {/* PASSWORD */}
               <div>
                 <label
                   htmlFor="password"
@@ -196,11 +244,16 @@ export default function Login() {
                     aria-label={showPassword ? "Hide password" : "Show password"}
                     className="shrink-0 text-slate-400 hover:text-slate-700"
                   >
-                    {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                    {showPassword ? (
+                      <EyeOff size={19} />
+                    ) : (
+                      <Eye size={19} />
+                    )}
                   </button>
                 </div>
               </div>
 
+              {/* LOGIN BUTTON */}
               <button
                 type="submit"
                 disabled={loading}
@@ -209,12 +262,13 @@ export default function Login() {
                 {loading ? (
                   <>
                     <LoaderCircle size={19} className="animate-spin" />
-                    Signing In...
+                    Checking Account...
                   </>
                 ) : (
                   "Sign In"
                 )}
               </button>
+
             </form>
 
             <p className="mt-6 text-center text-sm text-slate-500">
@@ -226,6 +280,7 @@ export default function Login() {
                 Create Account
               </Link>
             </p>
+
           </div>
         </section>
       </div>

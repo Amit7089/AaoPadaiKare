@@ -16,7 +16,7 @@ import StudentProtectedRoute from "./components/StudentProtectedRoute";
 import MyProfile from "./pages/MyProfile";
 
 // Admin
-import AdminLogin from "./pages/Admin/AdminLogin";
+
 import AdminNotes from "./pages/Admin/AdminNotes";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
@@ -100,7 +100,7 @@ export default function App() {
           />
 
           {/* Admin Routes */}
-          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/login" element={<Login />} />
 
           <Route
             path="/admin/dashboard"

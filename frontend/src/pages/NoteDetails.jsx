@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
-  Download,
   ExternalLink,
   FileText,
   GraduationCap,
@@ -15,6 +14,7 @@ import {
   Play,
   Printer,
   Video,
+  Maximize2,
 } from "lucide-react";
 
 const BACKEND_URL = (
@@ -24,7 +24,7 @@ const BACKEND_URL = (
 const getPdfUrl = (url) => {
   if (!url) return "";
 
-  if (url.startsWith("http://") || url.startsWith("https://")) {
+  if (/^https?:\/\//i.test(url)) {
     return url;
   }
 
@@ -50,9 +50,7 @@ const getYouTubeEmbedUrl = (url) => {
       } else {
         const parts = parsedUrl.pathname.split("/").filter(Boolean);
 
-        if (
-          ["embed", "shorts", "live"].includes(parts[0])
-        ) {
+        if (["embed", "shorts", "live"].includes(parts[0])) {
           videoId = parts[1];
         }
       }
@@ -81,6 +79,7 @@ export default function NoteDetails() {
     async function loadNote() {
       setLoading(true);
       setError("");
+      setNote(null);
 
       try {
         const [noteResult, chapterResult] = await Promise.all([
@@ -94,14 +93,18 @@ export default function NoteDetails() {
         const allNotes = Array.isArray(noteData)
           ? noteData
           : Array.isArray(noteData?.notes)
-          ? noteData.notes
-          : [];
+            ? noteData.notes
+            : Array.isArray(noteData?.data)
+              ? noteData.data
+              : [];
 
         const allChapters = Array.isArray(chapterData)
           ? chapterData
           : Array.isArray(chapterData?.syllabus)
-          ? chapterData.syllabus
-          : [];
+            ? chapterData.syllabus
+            : Array.isArray(chapterData?.data)
+              ? chapterData.data
+              : [];
 
         setNotes(allNotes);
         setChapters(allChapters);
@@ -117,6 +120,7 @@ export default function NoteDetails() {
           setNote(foundNote);
         }
       } catch (err) {
+        console.error("Load note error:", err);
         setError(err.message || "Note load नहीं हो पाया।");
       } finally {
         setLoading(false);
@@ -235,32 +239,18 @@ export default function NoteDetails() {
             Back to Study Notes
           </Link>
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
-            >
-              <Printer size={17} />
-              Print Notes
-            </button>
-
-            {pdfUrl && (
-              <a
-                href={pdfUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700"
-              >
-                <Download size={17} />
-                Download PDF
-              </a>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
+          >
+            <Printer size={17} />
+            Print Notes
+          </button>
         </div>
 
         {/* Chapter Header */}
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-
           <div className="bg-gradient-to-r from-indigo-800 via-indigo-700 to-blue-600 p-6 text-white sm:p-9">
             <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
               <BookOpen size={26} />
@@ -289,7 +279,7 @@ export default function NoteDetails() {
             </p>
           </div>
 
-          {/* Video Lecture - Header ke turant baad */}
+          {/* YouTube Video */}
           {note.youtubeUrl && (
             <div className="border-b border-slate-100 bg-white p-4 sm:p-7 print:hidden">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -338,7 +328,7 @@ export default function NoteDetails() {
                   <a
                     href={note.youtubeUrl}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="mt-3 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700"
                   >
                     <Play size={16} />
@@ -352,7 +342,7 @@ export default function NoteDetails() {
                 <a
                   href={note.youtubeUrl}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-slate-500 transition hover:text-indigo-600"
                 >
                   Open on YouTube
@@ -362,7 +352,7 @@ export default function NoteDetails() {
             </div>
           )}
 
-          {/* Study Material */}
+          {/* Study Material - Original Text Content Kept */}
           <div className="p-5 sm:p-9">
             <div className="mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
               <GraduationCap
@@ -380,32 +370,32 @@ export default function NoteDetails() {
               </div>
             </div>
 
+            {/* Existing written notes remain unchanged */}
             {note.content ? (
               <div className="whitespace-pre-wrap break-words text-[15px] leading-8 text-slate-700 sm:text-base">
                 {note.content}
               </div>
             ) : (
               <p className="rounded-xl bg-slate-50 p-5 text-sm text-slate-500">
-                इस Note का Text Content उपलब्ध नहीं है। PDF देखने के लिए
-                Download PDF बटन का उपयोग करें।
+                इस Note का Text Content उपलब्ध नहीं है।
               </p>
             )}
 
-            {/* PDF Material */}
+            {/* Only PDF preview changed to a button */}
             {pdfUrl && (
-              <div className="mt-8 rounded-2xl border border-indigo-100 bg-indigo-50 p-5 print:hidden">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-8 overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm print:hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-indigo-50 p-4 sm:p-5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-indigo-600">
-                      <FileText size={27} />
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-indigo-600">
+                      <FileText size={25} />
                     </div>
 
                     <div>
-                      <p className="font-extrabold text-slate-900">
-                        PDF Study Material
-                      </p>
+                      <h3 className="font-extrabold text-slate-900">
+                        Handwritten Notes
+                      </h3>
                       <p className="mt-1 text-xs text-slate-500">
-                        Open or download the chapter PDF
+                        {note.pdfName || "Chapter PDF"}
                       </p>
                     </div>
                   </div>
@@ -413,11 +403,12 @@ export default function NoteDetails() {
                   <a
                     href={pdfUrl}
                     target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
                   >
-                    <Download size={17} />
-                    View PDF
+                    <FileText size={17} />
+                    View Handwritten Note
+                    <ExternalLink size={15} />
                   </a>
                 </div>
               </div>
@@ -481,7 +472,6 @@ export default function NoteDetails() {
             padding: 0 !important;
           }
 
-          article,
           section {
             box-shadow: none !important;
           }

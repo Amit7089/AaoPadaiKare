@@ -7,30 +7,36 @@ const API_URL = (
 // ADMIN TOKEN
 // ==============================
 
-export const getAdminToken = () =>
-  localStorage.getItem("adminToken");
+export const getAdminToken = () => {
+  return localStorage.getItem("adminToken");
+};
 
 export const saveAdminToken = (token) => {
   localStorage.setItem("adminToken", token);
+  window.dispatchEvent(new Event("authChange"));
 };
 
 export const clearAdminToken = () => {
   localStorage.removeItem("adminToken");
+  window.dispatchEvent(new Event("authChange"));
 };
 
 // ==============================
 // STUDENT TOKEN
 // ==============================
 
-export const getStudentToken = () =>
-  localStorage.getItem("studentToken");
+export const getStudentToken = () => {
+  return localStorage.getItem("studentToken");
+};
 
 export const saveStudentToken = (token) => {
   localStorage.setItem("studentToken", token);
+  window.dispatchEvent(new Event("authChange"));
 };
 
 export const clearStudentToken = () => {
   localStorage.removeItem("studentToken");
+  window.dispatchEvent(new Event("authChange"));
 };
 
 // ==============================
@@ -101,6 +107,7 @@ async function request(endpoint, options = {}, authType = "none") {
 // ==============================
 
 export const api = {
+
   // ==============================
   // ADMIN AUTHENTICATION
   // ==============================
@@ -171,7 +178,9 @@ export const api = {
 
     const query = params.toString();
 
-    return request(`/notes${query ? `?${query}` : ""}`);
+    return request(
+      `/notes${query ? `?${query}` : ""}`
+    );
   },
 
   // Add New Note
