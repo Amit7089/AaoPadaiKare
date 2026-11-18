@@ -14,13 +14,32 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import StudentProtectedRoute from "./components/StudentProtectedRoute";
 import MyProfile from "./pages/MyProfile";
+import Membership from "./pages/Membership";
+
+// Student Quiz Pages
+import StudentQuizzes from "./pages/StudentQuizzes";
+import QuizAttempt from "./pages/QuizAttempt";
+import StudentQuizHistory from "./pages/StudentQuizHistory";
+import QuizResultDetails from "./pages/QuizResultDetails";
+import QuestionPapers from "./pages/QuestionPapers";
+// Student Competitive Courses
+// Student Competitive Courses
+import StudentCourses from "./pages/StudentCourses.jsx";
+import StudentCourseDetails from "./pages/StudentCourseDetails.jsx";
+import StudentCourseLesson from "./pages/StudentCourseLesson.jsx";
 
 // Admin
-
 import AdminNotes from "./pages/Admin/AdminNotes";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminSyllabus from "./pages/Admin/AdminSyllabus";
+import AdminLiveClasses from "./pages/Admin/AdminLiveClasses";
+import AdminQuizzes from "./pages/Admin/AdminQuizzes";
+import AdminAnalytics from "./pages/Admin/AdminAnalytics";
+import AdminQuestionPapers from "./pages/Admin/AdminQuestionPapers";
+
+// Competitive Courses Admin
+import AdminCourses from "./pages/Admin/AdminCourses";
 
 function NotFound() {
   return (
@@ -47,6 +66,7 @@ function NotFound() {
 
 export default function App() {
   const location = useLocation();
+
   const isAdminPage = location.pathname.startsWith("/admin");
 
   return (
@@ -55,7 +75,8 @@ export default function App() {
 
       <div className="flex-1">
         <Routes>
-          {/* Student Routes */}
+          {/* PUBLIC STUDENT ROUTES */}
+
           <Route path="/" element={<Home />} />
 
           <Route path="/classes" element={<Classes />} />
@@ -66,13 +87,20 @@ export default function App() {
 
           <Route path="/notes/:id" element={<NoteDetails />} />
 
+          <Route path="/question-papers" element={<QuestionPapers />} />
+
           <Route path="/quiz" element={<Quiz />} />
 
           <Route path="/login" element={<Login />} />
 
           <Route path="/register" element={<Register />} />
 
-          {/* Student Dashboard */}
+          {/* MEMBERSHIP */}
+
+          <Route path="/membership" element={<Membership />} />
+
+          {/* STUDENT PROTECTED ROUTES */}
+
           <Route
             path="/dashboard"
             element={
@@ -90,6 +118,7 @@ export default function App() {
               </StudentProtectedRoute>
             }
           />
+
           <Route
             path="/student/profile"
             element={
@@ -98,9 +127,78 @@ export default function App() {
               </StudentProtectedRoute>
             }
           />
+          {/* STUDENT COMPETITIVE COURSES */}
 
-          {/* Admin Routes */}
+          <Route
+            path="/student/courses"
+            element={
+              <StudentProtectedRoute>
+                <StudentCourses />
+              </StudentProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/student/courses/:slug"
+            element={
+              <StudentProtectedRoute>
+                <StudentCourseDetails />
+              </StudentProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/student/courses/:slug/lessons/:lessonId"
+            element={
+              <StudentProtectedRoute>
+                <StudentCourseLesson />
+              </StudentProtectedRoute>
+            }
+          />
+
+          {/* STUDENT ONLINE QUIZZES */}
+
+          <Route
+            path="/student/quizzes"
+            element={
+              <StudentProtectedRoute>
+                <StudentQuizzes />
+              </StudentProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/student/quizzes/:id"
+            element={
+              <StudentProtectedRoute>
+                <QuizAttempt />
+              </StudentProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/student/quiz-history"
+            element={
+              <StudentProtectedRoute>
+                <StudentQuizHistory />
+              </StudentProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/student/quizzes/:id/result"
+            element={
+              <StudentProtectedRoute>
+                <QuizResultDetails />
+              </StudentProtectedRoute>
+            }
+          />
+
+          {/* ADMIN LOGIN */}
+
           <Route path="/admin/login" element={<Login />} />
+
+          {/* ADMIN DASHBOARD */}
 
           <Route
             path="/admin/dashboard"
@@ -111,6 +209,8 @@ export default function App() {
             }
           />
 
+          {/* ADMIN NOTES */}
+
           <Route
             path="/admin/notes"
             element={
@@ -119,6 +219,8 @@ export default function App() {
               </AdminProtectedRoute>
             }
           />
+
+          {/* ADMIN SYLLABUS */}
 
           <Route
             path="/admin/syllabus"
@@ -129,7 +231,63 @@ export default function App() {
             }
           />
 
+          {/* ADMIN LIVE CLASSES */}
+
+          <Route
+            path="/admin/live-classes"
+            element={
+              <AdminProtectedRoute>
+                <AdminLiveClasses />
+              </AdminProtectedRoute>
+            }
+          />
+
+          {/* ADMIN QUIZ MANAGEMENT */}
+
+          <Route
+            path="/admin/quizzes"
+            element={
+              <AdminProtectedRoute>
+                <AdminQuizzes />
+              </AdminProtectedRoute>
+            }
+          />
+
+          {/* ADMIN ANALYTICS */}
+
+          <Route
+            path="/admin/analytics"
+            element={
+              <AdminProtectedRoute>
+                <AdminAnalytics />
+              </AdminProtectedRoute>
+            }
+          />
+
+          {/* ADMIN QUESTION PAPERS */}
+
+          <Route
+            path="/admin/question-papers"
+            element={
+              <AdminProtectedRoute>
+                <AdminQuestionPapers />
+              </AdminProtectedRoute>
+            }
+          />
+
+          {/* ADMIN COMPETITIVE COURSES */}
+
+          <Route
+            path="/admin/courses"
+            element={
+              <AdminProtectedRoute>
+                <AdminCourses />
+              </AdminProtectedRoute>
+            }
+          />
+
           {/* 404 */}
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

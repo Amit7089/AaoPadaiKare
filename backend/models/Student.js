@@ -1,6 +1,44 @@
 
 import mongoose from "mongoose";
 
+const classMembershipSchema = new mongoose.Schema(
+  {
+    classNo: {
+      type: Number,
+      required: true,
+      min: 6,
+      max: 12,
+    },
+    plan: {
+      type: String,
+      enum: ["monthly", "yearly"],
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["active", "expired", "pending"],
+      default: "pending",
+    },
+    purchasedAt: {
+      type: Date,
+      default: null,
+    },
+    expiresAt: {
+      type: Date,
+      default: null,
+    },
+    paymentId: {
+      type: String,
+      default: "",
+    },
+    orderId: {
+      type: String,
+      default: "",
+    },
+  },
+  { timestamps: true }
+);
+
 const studentSchema = new mongoose.Schema(
   {
     name: {
@@ -32,10 +70,10 @@ const studentSchema = new mongoose.Schema(
       required: true,
       select: false,
     },
-    membership: {
-      type: String,
-      enum: ["free", "premium"],
-      default: "free",
+
+    memberships: {
+      type: [classMembershipSchema],
+      default: [],
     },
   },
   { timestamps: true }

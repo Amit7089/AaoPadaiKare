@@ -20,6 +20,8 @@ import {
   X,
   Play,
   ExternalLink,
+  Eye,
+  Lock,
 } from "lucide-react";
 
 import { api, clearAdminToken } from "../../services/api";
@@ -48,8 +50,10 @@ const initialNote = {
   title: "",
   content: "",
   youtubeUrl: "",
-  isPremium: false,
 };
+
+const inputClass =
+  "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
 const getYouTubeVideoId = (url) => {
   if (!url) return "";
@@ -89,6 +93,15 @@ const isValidYouTubeUrl = (url) => {
   return Boolean(getYouTubeVideoId(url.trim()));
 };
 
+const getResponseList = (result) => {
+  if (Array.isArray(result?.data)) return result.data;
+  if (Array.isArray(result?.data?.notes)) return result.data.notes;
+  if (Array.isArray(result?.data?.syllabus)) return result.data.syllabus;
+  if (Array.isArray(result?.notes)) return result.notes;
+  if (Array.isArray(result?.syllabus)) return result.syllabus;
+  return [];
+};
+
 export default function AdminNotes() {
   const navigate = useNavigate();
 
@@ -105,6 +118,7 @@ export default function AdminNotes() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [openingPdfId, setOpeningPdfId] = useState(null);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -114,9 +128,6 @@ export default function AdminNotes() {
   const [filterSubject, setFilterSubject] = useState("all");
   const [filterChapter, setFilterChapter] = useState("all");
   const [filterType, setFilterType] = useState("all");
-
-  const inputClass =
-    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
   const showMessage = (text) => {
     setMessage(text);
@@ -128,12 +139,20 @@ export default function AdminNotes() {
     setMessage("");
   };
 
+  // ==========================================
+  // LOGOUT
+  // ==========================================
+
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to logout?")) {
       clearAdminToken();
       navigate("/admin/login", { replace: true });
     }
   };
+
+  // ==========================================
+  // LOAD ADMIN DATA
+  // ==========================================
 
   const loadData = async () => {
     try {
@@ -142,20 +161,11 @@ export default function AdminNotes() {
 
       const [chapterResult, noteResult] = await Promise.all([
         api.getSyllabus(),
-        api.getNotes(),
+        api.getAdminNotes(),
       ]);
 
-      setChapters(
-        Array.isArray(chapterResult.data)
-          ? chapterResult.data
-          : chapterResult.data?.syllabus || []
-      );
-
-      setNotes(
-        Array.isArray(noteResult.data)
-          ? noteResult.data
-          : noteResult.data?.notes || []
-      );
+      setChapters(getResponseList(chapterResult));
+      setNotes(getResponseList(noteResult));
     } catch (err) {
       showError(err.message || "Data load nahi ho paya.");
     } finally {
@@ -166,6 +176,10 @@ export default function AdminNotes() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // ==========================================
+  // SUBJECT AND CHAPTER OPTIONS
+  // ==========================================
 
   const noteSubjects = useMemo(() => {
     return [
@@ -198,6 +212,10 @@ export default function AdminNotes() {
       }));
     }
   }, [noteSubjects, noteForm.subject]);
+
+  // ==========================================
+  // FILTER OPTIONS
+  // ==========================================
 
   const noteFilterSubjects = useMemo(
     () =>
@@ -279,6 +297,10 @@ export default function AdminNotes() {
     filterChapter !== "all" ||
     filterType !== "all";
 
+  // ==========================================
+  // CHAPTER MANAGEMENT
+  // ==========================================
+
   const addChapter = async (event) => {
     event.preventDefault();
 
@@ -331,13 +353,17 @@ export default function AdminNotes() {
     }
   };
 
+  // ==========================================
+  // NOTE FORM
+  // ==========================================
+
   const handleNoteChange = (event) => {
-    const { name, value, checked, type } = event.target;
+    const { name, value } = event.target;
 
     setNoteForm((previous) => {
       const updated = {
         ...previous,
-        [name]: type === "checkbox" ? checked : value,
+        [name]: value,
       };
 
       if (name === "classNo") {
@@ -372,7 +398,6 @@ export default function AdminNotes() {
       title: note.title || "",
       content: note.content || "",
       youtubeUrl: note.youtubeUrl || "",
-      isPremium: Boolean(note.isPremium),
     });
 
     setPdf(null);
@@ -388,6 +413,46 @@ export default function AdminNotes() {
       behavior: "smooth",
     });
   };
+
+  // ==========================================
+  // OPEN PDF USING ADMIN AUTHENTICATION
+  // ==========================================
+
+  const openAdminPdf = async (note) => {
+    const pdfWindow = window.open("about:blank", "_blank");
+
+    if (!pdfWindow) {
+      showError("Browser ne new tab block kar diya. Pop-ups allow karein.");
+      return;
+    }
+
+    pdfWindow.opener = null;
+
+    try {
+      setOpeningPdfId(note._id);
+      setError("");
+
+      const result = await api.getAdminNote(note._id);
+      const pdfUrl = result?.data?.pdfUrl;
+
+      if (!pdfUrl) {
+        pdfWindow.close();
+        showError("Is note ke liye PDF available nahi hai.");
+        return;
+      }
+
+      pdfWindow.location.href = pdfUrl;
+    } catch (err) {
+      pdfWindow.close();
+      showError(err.message || "PDF open nahi ho payi.");
+    } finally {
+      setOpeningPdfId(null);
+    }
+  };
+
+  // ==========================================
+  // ADD / UPDATE NOTE
+  // ==========================================
 
   const addNote = async (event) => {
     event.preventDefault();
@@ -410,7 +475,7 @@ export default function AdminNotes() {
     if (
       !noteForm.content.trim() &&
       !pdf &&
-      !editingNote?.pdfUrl
+      !editingNote?.hasPdf
     ) {
       showError("Please enter note content or select a PDF.");
       return;
@@ -444,7 +509,6 @@ export default function AdminNotes() {
       formData.append("title", noteForm.title.trim());
       formData.append("content", noteForm.content);
       formData.append("youtubeUrl", noteForm.youtubeUrl.trim());
-      formData.append("isPremium", String(noteForm.isPremium));
 
       if (pdf) {
         formData.append("pdf", pdf);
@@ -472,6 +536,10 @@ export default function AdminNotes() {
     }
   };
 
+  // ==========================================
+  // DELETE NOTE
+  // ==========================================
+
   const deleteNote = async (id) => {
     if (!window.confirm("Are you sure you want to delete this note?")) {
       return;
@@ -496,23 +564,23 @@ export default function AdminNotes() {
     }
   };
 
-  const getPdfUrl = (pdfPath) => {
-    if (!pdfPath) return "";
+  // ==========================================
+  // SUMMARY
+  // ==========================================
 
-    if (pdfPath.startsWith("http://") || pdfPath.startsWith("https://")) {
-      return pdfPath;
-    }
+  const premiumCount = notes.filter((note) => note.isPremium).length;
+  const freeCount = notes.length - premiumCount;
 
-    const apiBase = (
-      import.meta.env.VITE_API_URL || "http://localhost:5000/api"
-    ).replace(/\/api\/?$/, "");
-
-    return `${apiBase}${pdfPath.startsWith("/") ? "" : "/"}${pdfPath}`;
-  };
+  // ==========================================
+  // UI
+  // ==========================================
 
   return (
     <main className="min-h-screen bg-[#f5f7fb] px-4 py-7 sm:px-6">
       <div className="mx-auto max-w-7xl">
+
+        {/* HEADER */}
+
         <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link
@@ -561,7 +629,9 @@ export default function AdminNotes() {
           </div>
         </header>
 
-        <section className="mb-7 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        {/* SUMMARY CARDS */}
+
+        <section className="mb-7 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <BookOpen className="mb-3 text-blue-600" size={24} />
             <p className="text-3xl font-black text-slate-900">
@@ -578,18 +648,24 @@ export default function AdminNotes() {
             <p className="mt-1 text-sm text-slate-500">Total Notes</p>
           </div>
 
-          <div className="col-span-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:col-span-1">
-            <BookOpen className="mb-3 text-violet-600" size={24} />
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <CheckCircle2 className="mb-3 text-emerald-600" size={24} />
             <p className="text-3xl font-black text-slate-900">
-              {
-                new Set(
-                  chapters.map((item) => `${item.classNo}-${item.subject}`)
-                ).size
-              }
+              {freeCount}
             </p>
-            <p className="mt-1 text-sm text-slate-500">Total Subjects</p>
+            <p className="mt-1 text-sm text-slate-500">Free Notes</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <Lock className="mb-3 text-amber-600" size={24} />
+            <p className="text-3xl font-black text-slate-900">
+              {premiumCount}
+            </p>
+            <p className="mt-1 text-sm text-slate-500">Premium Notes</p>
           </div>
         </section>
+
+        {/* MESSAGES */}
 
         {message && (
           <div className="mb-5 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
@@ -604,6 +680,8 @@ export default function AdminNotes() {
             {error}
           </div>
         )}
+
+        {/* TABS */}
 
         <div className="mb-6 flex gap-2 overflow-x-auto">
           <button
@@ -645,8 +723,11 @@ export default function AdminNotes() {
           </button>
         </div>
 
+        {/* CHAPTER MANAGEMENT */}
+
         {tab === "chapters" && (
           <section className="grid gap-6 lg:grid-cols-2">
+
             <form
               onSubmit={addChapter}
               className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
@@ -759,6 +840,7 @@ export default function AdminNotes() {
                         <p className="font-bold text-slate-800">
                           {item.chapter}
                         </p>
+
                         <p className="mt-1 text-xs text-slate-500">
                           Class {item.classNo} · {item.subject}
                         </p>
@@ -788,8 +870,13 @@ export default function AdminNotes() {
           </section>
         )}
 
+        {/* NOTES MANAGEMENT */}
+
         {tab === "notes" && (
           <section className="grid gap-6 lg:grid-cols-2">
+
+            {/* NOTE FORM */}
+
             <form
               onSubmit={addNote}
               className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
@@ -799,6 +886,7 @@ export default function AdminNotes() {
                   <h2 className="text-xl font-black text-slate-900">
                     {editingNote ? "Edit Study Notes" : "Upload Study Notes"}
                   </h2>
+
                   <p className="mt-2 text-sm text-slate-500">
                     Add notes, PDF and an optional YouTube lesson.
                   </p>
@@ -840,6 +928,7 @@ export default function AdminNotes() {
                 disabled={noteSubjects.length === 0}
               >
                 <option value="">Select subject</option>
+
                 {noteSubjects.map((subject) => (
                   <option key={subject} value={subject}>
                     {subject}
@@ -865,6 +954,7 @@ export default function AdminNotes() {
                 disabled={classChapters.length === 0}
               >
                 <option value="">Select chapter</option>
+
                 {classChapters.map((item) => (
                   <option key={item._id} value={item.chapter}>
                     {item.chapter}
@@ -898,6 +988,8 @@ export default function AdminNotes() {
                 onChange={handleNoteChange}
               />
 
+              {/* YOUTUBE */}
+
               <div className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4">
                 <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800">
                   <Play size={18} className="text-red-600" />
@@ -918,14 +1010,17 @@ export default function AdminNotes() {
                   Student ko notes ke saath video bhi dikhega.
                 </p>
 
-                {noteForm.youtubeUrl && isValidYouTubeUrl(noteForm.youtubeUrl) && (
-                  <p className="mt-2 text-xs font-semibold text-emerald-700">
-                    YouTube URL looks valid.
-                  </p>
-                )}
+                {noteForm.youtubeUrl &&
+                  isValidYouTubeUrl(noteForm.youtubeUrl) && (
+                    <p className="mt-2 text-xs font-semibold text-emerald-700">
+                      YouTube URL looks valid.
+                    </p>
+                  )}
               </div>
 
-              {editingNote?.pdfUrl && !pdf && (
+              {/* EXISTING PDF */}
+
+              {editingNote?.hasPdf && !pdf && (
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm">
                   <span className="flex min-w-0 items-center gap-2 text-blue-700">
                     <FileText size={17} />
@@ -934,16 +1029,23 @@ export default function AdminNotes() {
                     </span>
                   </span>
 
-                  <a
-                    href={getPdfUrl(editingNote.pdfUrl)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 font-bold text-blue-700 underline"
+                  <button
+                    type="button"
+                    onClick={() => openAdminPdf(editingNote)}
+                    disabled={openingPdfId === editingNote._id}
+                    className="inline-flex shrink-0 items-center gap-1 font-bold text-blue-700 underline disabled:opacity-50"
                   >
+                    {openingPdfId === editingNote._id ? (
+                      <LoaderCircle size={15} className="animate-spin" />
+                    ) : (
+                      <Eye size={15} />
+                    )}
                     View PDF
-                  </a>
+                  </button>
                 </div>
               )}
+
+              {/* PDF UPLOAD */}
 
               <label className="mb-2 mt-5 block text-sm font-bold text-slate-700">
                 {editingNote ? "Replace PDF (Optional)" : "Upload PDF (Optional)"}
@@ -968,23 +1070,28 @@ export default function AdminNotes() {
                 </div>
               )}
 
-              <label className="mt-5 flex cursor-pointer items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <input
-                  name="isPremium"
-                  type="checkbox"
-                  checked={noteForm.isPremium}
-                  onChange={handleNoteChange}
-                  className="h-5 w-5 accent-amber-600"
-                />
-                <div>
-                  <p className="text-sm font-bold text-amber-800">
-                    Premium Note
-                  </p>
-                  <p className="mt-1 text-xs text-amber-700">
-                    Mark this content as Premium.
-                  </p>
+              {/* AUTOMATIC MEMBERSHIP RULE */}
+
+              <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-start gap-3">
+                  <Lock size={19} className="mt-0.5 text-amber-700" />
+
+                  <div>
+                    <p className="text-sm font-bold text-amber-800">
+                      Automatic Free / Premium Access
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-amber-700">
+                      Har subject ke pehle 3 notes Free rahenge.
+                      Uske baad ke notes automatically Premium honge.
+                      Premium access ke liye student ko us class ki active
+                      membership chahiye.
+                    </p>
+                  </div>
                 </div>
-              </label>
+              </div>
+
+              {/* SAVE */}
 
               <button
                 type="submit"
@@ -1027,12 +1134,15 @@ export default function AdminNotes() {
               )}
             </form>
 
+            {/* UPLOADED NOTES */}
+
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
               <div className="mb-6 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-black text-slate-900">
                     Uploaded Notes
                   </h2>
+
                   <p className="mt-1 text-sm text-slate-500">
                     Manage your saved study materials.
                   </p>
@@ -1043,12 +1153,15 @@ export default function AdminNotes() {
                 </span>
               </div>
 
+              {/* SEARCH AND FILTER */}
+
               <div className="mb-5 space-y-3">
                 <div className="relative">
                   <Search
                     size={18}
                     className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                   />
+
                   <input
                     type="text"
                     value={searchTerm}
@@ -1130,6 +1243,7 @@ export default function AdminNotes() {
                     <p className="text-xs text-slate-500">
                       {filteredNotes.length} matching notes found
                     </p>
+
                     <button
                       type="button"
                       onClick={clearFilters}
@@ -1140,6 +1254,8 @@ export default function AdminNotes() {
                   </div>
                 )}
               </div>
+
+              {/* NOTES LIST */}
 
               {loading ? (
                 <div className="flex justify-center p-8">
@@ -1154,9 +1270,11 @@ export default function AdminNotes() {
                     className="mx-auto mb-3 text-slate-300"
                     size={36}
                   />
+
                   <p className="font-bold text-slate-600">
                     No notes uploaded yet.
                   </p>
+
                   <p className="mt-1 text-sm text-slate-400">
                     Your uploaded notes will appear here.
                   </p>
@@ -1167,12 +1285,15 @@ export default function AdminNotes() {
                     className="mx-auto mb-3 text-slate-300"
                     size={36}
                   />
+
                   <p className="font-bold text-slate-600">
                     No matching notes found.
                   </p>
+
                   <p className="mt-1 text-sm text-slate-400">
                     Try changing your search or filters.
                   </p>
+
                   <button
                     type="button"
                     onClick={clearFilters}
@@ -1220,6 +1341,13 @@ export default function AdminNotes() {
                               {note.isPremium ? "Premium" : "Free"}
                             </span>
 
+                            {note.hasPdf && (
+                              <span className="flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-600">
+                                <FileText size={12} />
+                                PDF Attached
+                              </span>
+                            )}
+
                             {note.youtubeUrl && (
                               <span className="flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600">
                                 <Play size={12} />
@@ -1228,12 +1356,31 @@ export default function AdminNotes() {
                             )}
                           </div>
 
+                          {note.hasPdf && (
+                            <button
+                              type="button"
+                              onClick={() => openAdminPdf(note)}
+                              disabled={openingPdfId === note._id}
+                              className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline disabled:opacity-50"
+                            >
+                              {openingPdfId === note._id ? (
+                                <LoaderCircle
+                                  size={13}
+                                  className="animate-spin"
+                                />
+                              ) : (
+                                <Eye size={13} />
+                              )}
+                              View PDF
+                            </button>
+                          )}
+
                           {note.youtubeUrl && (
                             <a
                               href={note.youtubeUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline"
+                              className="ml-3 mt-3 inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline"
                             >
                               Open YouTube Video
                               <ExternalLink size={12} />
@@ -1276,6 +1423,8 @@ export default function AdminNotes() {
             </div>
           </section>
         )}
+
+        {/* FOOTER */}
 
         <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 py-5 text-xs text-slate-400">
           <p>

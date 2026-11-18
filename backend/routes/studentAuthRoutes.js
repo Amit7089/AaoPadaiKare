@@ -46,7 +46,11 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    if (!Number.isInteger(selectedClass) || selectedClass < 6 || selectedClass > 12) {
+    if (
+      !Number.isInteger(selectedClass) ||
+      selectedClass < 6 ||
+      selectedClass > 12
+    ) {
       return res.status(400).json({
         success: false,
         message: "Please select a class between 6 and 12",
@@ -79,6 +83,7 @@ router.post("/register", async (req, res) => {
       mobile: cleanMobile,
       classNo: selectedClass,
       password: hashedPassword,
+      memberships: [],
     });
 
     return res.status(201).json({
@@ -90,7 +95,7 @@ router.post("/register", async (req, res) => {
         email: student.email,
         mobile: student.mobile,
         classNo: student.classNo,
-        membership: student.membership,
+        memberships: student.memberships,
       },
     });
   } catch (error) {
@@ -161,7 +166,7 @@ router.post("/login", async (req, res) => {
         email: student.email,
         mobile: student.mobile,
         classNo: student.classNo,
-        membership: student.membership,
+        memberships: student.memberships,
       },
     });
   } catch (error) {

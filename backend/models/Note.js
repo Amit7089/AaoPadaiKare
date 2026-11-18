@@ -43,6 +43,11 @@ const noteSchema = new mongoose.Schema(
       type: String,
       default: "raw",
     },
+    pdfDeliveryType: {
+      type: String,
+      enum: ["upload", "authenticated"],
+      default: "authenticated",
+    },
     youtubeUrl: {
       type: String,
       default: "",

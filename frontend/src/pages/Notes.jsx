@@ -1,10 +1,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-
 import {
   FileText,
-  Download,
   Search,
   LoaderCircle,
   BookOpen,
@@ -17,72 +15,200 @@ import {
   Layers3,
   X,
   Home,
-  ExternalLink,
+  LockKeyhole,
+  Crown,
+  ShieldCheck,
 } from "lucide-react";
-
 import { api } from "../services/api";
-
-const BACKEND_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api"
-).replace(/\/api\/?$/, "");
 
 const CLASSES = [6, 7, 8, 9, 10, 11, 12];
 
-// PDF URL helper
-const getPdfUrl = (pdfUrl) => {
-  if (!pdfUrl) return "";
+const subjectStyles = [
+  "from-blue-500 to-indigo-600",
+  "from-emerald-500 to-teal-600",
+  "from-orange-500 to-amber-600",
+  "from-violet-500 to-purple-600",
+  "from-rose-500 to-pink-600",
+  "from-cyan-500 to-sky-600",
+];
 
-  // Cloudinary ya kisi bhi external URL ko directly return karega
-  if (/^https?:\/\//i.test(pdfUrl)) {
-    return pdfUrl;
+const getList = (response, key) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.data?.[key])) {
+    return response.data[key];
   }
-
-  // Local backend URL ke liye
-  return `${BACKEND_URL.replace(/\/$/, "")}/${pdfUrl.replace(/^\//, "")}`;
+  if (Array.isArray(response?.[key])) return response[key];
+  return [];
 };
 
-// Note count helper
-const getNoteCount = (notes, classNo, subject, chapter) => {
-  return notes.filter(
-    (note) =>
-      Number(note.classNo) === Number(classNo) &&
-      note.subject === subject &&
-      note.chapter === chapter
-  ).length;
-};
+function EmptyState({ message }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-16 text-center">
+      <FolderOpen
+        className="mx-auto mb-4 text-slate-400"
+        size={45}
+      />
+      <h3 className="text-lg font-bold text-slate-800">
+        No Content Available
+      </h3>
+      <p className="mt-2 text-sm text-slate-500">
+        {message}
+      </p>
+    </div>
+  );
+}
+
+function NoteCard({ note }) {
+  const locked = Boolean(note.isLocked);
+
+  return (
+    <article className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl">
+      <div className="p-5 sm:p-6">
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${
+            locked
+              ? "bg-amber-50 text-amber-600"
+              : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"
+          }`}>
+            {locked ? (
+              <LockKeyhole size={24} />
+            ) : (
+              <BookOpen size={25} />
+            )}
+          </div>
+
+          {locked ? (
+            <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+              <LockKeyhole size={12} className="mr-1 inline" />
+              Premium Locked
+            </span>
+          ) : note.isPremium ? (
+            <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+              Premium
+            </span>
+          ) : (
+            <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+              Free
+            </span>
+          )}
+        </div>
+
+        <div className="mb-4 flex flex-wrap gap-2">
+          <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+            Class {note.classNo}
+          </span>
+
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+            {note.subject}
+          </span>
+        </div>
+
+        <h3 className="line-clamp-2 min-h-[3.5rem] text-lg font-extrabold leading-7 text-slate-900">
+          {note.title}
+        </h3>
+
+        <p className="mt-2 text-sm font-medium text-indigo-600">
+          {note.chapter}
+        </p>
+
+        <div className="mt-4 min-h-[6rem]">
+          {locked ? (
+            <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-4">
+              <p className="flex items-center gap-2 text-sm font-bold text-amber-800">
+                <LockKeyhole size={16} />
+                Premium Content Locked
+              </p>
+              <p className="mt-2 text-sm leading-6 text-amber-700">
+                Activate Class {note.classNo} membership to read
+                the complete notes and access learning resources.
+              </p>
+            </div>
+          ) : note.content ? (
+            <p className="line-clamp-4 whitespace-pre-line text-sm leading-6 text-slate-600">
+              {note.content}
+            </p>
+          ) : (
+            <p className="text-sm italic text-slate-400">
+              Study material available inside this note.
+            </p>
+          )}
+        </div>
+
+        {!locked && note.hasPdf && (
+          <p className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-500">
+            <FileText size={15} />
+            PDF study material available
+          </p>
+        )}
+
+        {!locked && note.youtubeUrl && (
+          <p className="mt-2 flex items-center gap-2 text-xs font-medium text-slate-500">
+            <BookOpen size={15} />
+            Video lecture available
+          </p>
+        )}
+      </div>
+
+      <div className="mt-auto border-t border-slate-100 bg-slate-50/70 p-5">
+        <Link
+          to={`/notes/${note._id}`}
+          className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition ${
+            locked
+              ? "bg-amber-600 hover:bg-amber-700"
+              : "bg-indigo-600 hover:bg-indigo-700"
+          }`}
+        >
+          {locked ? (
+            <>
+              <LockKeyhole size={17} />
+              View Membership Options
+            </>
+          ) : (
+            <>
+              <BookMarked size={17} />
+              Read Full Notes
+            </>
+          )}
+          <ArrowRight size={16} />
+        </Link>
+      </div>
+    </article>
+  );
+}
 
 export default function Notes() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const classNo = searchParams.get("class") || "";
+  const subject = searchParams.get("subject") || "";
+  const chapter = searchParams.get("chapter") || "";
 
   const [chapters, setChapters] = useState([]);
   const [notes, setNotes] = useState([]);
-
-  const [classNo, setClassNo] = useState(
-    searchParams.get("class") || ""
-  );
-
-  const [subject, setSubject] = useState(
-    searchParams.get("subject") || ""
-  );
-
-  const [chapter, setChapter] = useState(
-    searchParams.get("chapter") || ""
-  );
-
   const [search, setSearch] = useState("");
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Sync filters from URL
-  useEffect(() => {
-    setClassNo(searchParams.get("class") || "");
-    setSubject(searchParams.get("subject") || "");
-    setChapter(searchParams.get("chapter") || "");
-  }, [searchParams]);
+  // URL filter updater
+  const updateFilters = (updates, options = {}) => {
+    const next = new URLSearchParams(searchParams);
 
-  // Load syllabus and notes
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === "" || value === null || value === undefined) {
+        next.delete(key);
+      } else {
+        next.set(key, String(value));
+      }
+    });
+
+    setSearchParams(next, options);
+  };
+
+  // Load syllabus and student-safe notes
   useEffect(() => {
+    let active = true;
+
     async function loadNotes() {
       try {
         setLoading(true);
@@ -93,25 +219,25 @@ export default function Notes() {
           api.getNotes(),
         ]);
 
-        const syllabusData = Array.isArray(chapterResult.data)
-          ? chapterResult.data
-          : chapterResult.data?.syllabus || [];
+        if (!active) return;
 
-        const notesData = Array.isArray(noteResult.data)
-          ? noteResult.data
-          : noteResult.data?.notes || [];
-
-        setChapters(syllabusData);
-        setNotes(notesData);
+        setChapters(getList(chapterResult, "syllabus"));
+        setNotes(getList(noteResult, "notes"));
       } catch (err) {
+        if (!active) return;
+
         console.error("Notes loading error:", err);
         setError(err.message || "Notes load nahi ho paye.");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
 
     loadNotes();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Subjects for selected class
@@ -196,66 +322,64 @@ export default function Notes() {
     });
   }, [notes, search]);
 
-  // Class-wise note count
-  const getClassCount = (number) => {
-    return notes.filter(
-      (note) => Number(note.classNo) === number
-    ).length;
-  };
+  const getClassCount = (number) =>
+    notes.filter((note) => Number(note.classNo) === number).length;
 
-  // Subject-wise note count
-  const getSubjectCount = (item) => {
-    return notes.filter(
+  const getSubjectCount = (item) =>
+    notes.filter(
       (note) =>
         Number(note.classNo) === Number(classNo) &&
         note.subject === item
     ).length;
-  };
 
-  // Reset all selections
+  const getNoteCount = (item) =>
+    notes.filter(
+      (note) =>
+        Number(note.classNo) === Number(classNo) &&
+        note.subject === subject &&
+        note.chapter === item
+    ).length;
+
+  // Navigation actions
   const resetFilters = () => {
-    setClassNo("");
-    setSubject("");
-    setChapter("");
     setSearch("");
+    setSearchParams({});
   };
 
-  // Select class
   const selectClass = (number) => {
-    setClassNo(String(number));
-    setSubject("");
-    setChapter("");
     setSearch("");
+    updateFilters({
+      class: number,
+      subject: "",
+      chapter: "",
+    });
   };
 
-  // Select subject
   const selectSubject = (item) => {
-    setSubject(item);
-    setChapter("");
     setSearch("");
+    updateFilters({
+      subject: item,
+      chapter: "",
+    });
   };
 
-  // Select chapter
   const selectChapter = (item) => {
-    setChapter(item);
     setSearch("");
+    updateFilters({ chapter: item });
   };
 
-  // Go back one level
   const goBack = () => {
+    setSearch("");
+
     if (chapter) {
-      setChapter("");
+      updateFilters({ chapter: "" });
     } else if (subject) {
-      setSubject("");
+      updateFilters({ subject: "", chapter: "" });
     } else if (classNo) {
-      setClassNo("");
+      updateFilters({ class: "", subject: "", chapter: "" });
     }
   };
 
-  const inputClass =
-    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100";
-
-  // Current navigation level
   const currentLevel = chapter
     ? "notes"
     : subject
@@ -264,101 +388,10 @@ export default function Notes() {
         ? "subjects"
         : "classes";
 
-  // Search result view
   const isSearching = search.trim().length > 0;
 
-  // Note card
-  const NoteCard = ({ note }) => {
-    const pdfUrl = getPdfUrl(note.pdfUrl);
-
-    return (
-      <article
-        key={note._id}
-        className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl"
-      >
-        <div className="p-5 sm:p-6">
-          <div className="mb-5 flex items-start justify-between gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
-              <BookOpen size={25} />
-            </div>
-
-            {note.isPremium ? (
-              <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
-                Premium
-              </span>
-            ) : (
-              <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
-                Free
-              </span>
-            )}
-          </div>
-
-          <div className="mb-4 flex flex-wrap gap-2">
-            <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
-              Class {note.classNo}
-            </span>
-
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              {note.subject}
-            </span>
-          </div>
-
-          <h3 className="line-clamp-2 min-h-[3.5rem] text-lg font-extrabold leading-7 text-slate-900">
-            {note.title}
-          </h3>
-
-          <p className="mt-2 text-sm font-medium text-indigo-600">
-            {note.chapter}
-          </p>
-
-          <div className="mt-4 min-h-[6rem]">
-            {note.content ? (
-              <p className="line-clamp-4 whitespace-pre-line text-sm leading-6 text-slate-600">
-                {note.content}
-              </p>
-            ) : (
-              <p className="text-sm italic text-slate-400">
-                PDF study material available.
-              </p>
-            )}
-          </div>
-
-          {note.pdfName && (
-            <p className="mt-3 flex items-center gap-2 break-all text-xs text-slate-500">
-              <FileText size={15} className="shrink-0" />
-              {note.pdfName}
-            </p>
-          )}
-        </div>
-
-        <div className="mt-auto border-t border-slate-100 bg-slate-50/70 p-5">
-          <div className="flex flex-col gap-3">
-            <Link
-              to={`/notes/${note._id}`}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
-            >
-              <BookMarked size={17} />
-              Read Full Notes
-              <ArrowRight size={16} />
-            </Link>
-
-            {pdfUrl && (
-              <a
-                href={pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600"
-              >
-                <Download size={17} />
-                View / Download PDF
-                <ExternalLink size={15} />
-              </a>
-            )}
-          </div>
-        </div>
-      </article>
-    );
-  };
+  const inputClass =
+    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100";
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:py-12">
@@ -443,13 +476,14 @@ export default function Notes() {
             {classNo && (
               <>
                 <ChevronRight size={15} className="text-slate-400" />
-
                 <button
                   type="button"
-                  onClick={() => {
-                    setSubject("");
-                    setChapter("");
-                  }}
+                  onClick={() =>
+                    updateFilters({
+                      subject: "",
+                      chapter: "",
+                    })
+                  }
                   className={`font-semibold ${
                     !subject
                       ? "text-indigo-700"
@@ -464,10 +498,9 @@ export default function Notes() {
             {subject && (
               <>
                 <ChevronRight size={15} className="text-slate-400" />
-
                 <button
                   type="button"
-                  onClick={() => setChapter("")}
+                  onClick={() => updateFilters({ chapter: "" })}
                   className={`font-semibold ${
                     !chapter
                       ? "text-indigo-700"
@@ -490,8 +523,30 @@ export default function Notes() {
           </div>
         )}
 
-        {/* Search Results */}
-        {isSearching ? (
+        {/* Loading / Error / Content */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <LoaderCircle
+              className="animate-spin text-indigo-600"
+              size={38}
+            />
+            <p className="mt-3 text-sm text-slate-500">
+              Loading study material...
+            </p>
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-3 font-bold underline"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : isSearching ? (
+          /* Search Results */
           <section>
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -532,254 +587,219 @@ export default function Notes() {
               </button>
             )}
 
-            {/* Loading / Error / Content */}
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <LoaderCircle
-                  className="animate-spin text-indigo-600"
-                  size={38}
-                />
-                <p className="mt-3 text-sm text-slate-500">
-                  Loading study material...
-                </p>
-              </div>
-            ) : error ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">
-                {error}
-                <button
-                  type="button"
-                  onClick={() => window.location.reload()}
-                  className="ml-3 font-bold underline"
-                >
-                  Try Again
-                </button>
-              </div>
-            ) : (
-              <>
-                {/* LEVEL 1: CLASSES */}
-                {currentLevel === "classes" && (
-                  <section>
-                    <div className="mb-6">
-                      <h2 className="text-2xl font-extrabold text-slate-900">
-                        Select Your Class
-                      </h2>
+            {/* LEVEL 1: CLASSES */}
+            {currentLevel === "classes" && (
+              <section>
+                <div className="mb-6">
+                  <h2 className="text-2xl font-extrabold text-slate-900">
+                    Select Your Class
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Choose your class to explore study material.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                  {CLASSES.map((number) => (
+                    <button
+                      key={number}
+                      type="button"
+                      onClick={() => selectClass(number)}
+                      className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-lg sm:p-6"
+                    >
+                      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
+                        <GraduationCap size={26} />
+                      </div>
+
+                      <h3 className="text-xl font-extrabold text-slate-900">
+                        Class {number}
+                      </h3>
+
                       <p className="mt-2 text-sm text-slate-500">
-                        Choose your class to explore study material.
+                        {getClassCount(number)} Study Notes
                       </p>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                      {CLASSES.map((number) => (
-                        <button
-                          key={number}
-                          type="button"
-                          onClick={() => selectClass(number)}
-                          className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-lg sm:p-6"
-                        >
-                          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
-                            <GraduationCap size={26} />
-                          </div>
+                      <div className="mt-5 flex items-center justify-between text-sm font-bold text-indigo-600">
+                        Explore Class
+                        <ArrowRight size={17} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
-                          <h3 className="text-xl font-extrabold text-slate-900">
-                            Class {number}
+            {/* LEVEL 2: SUBJECTS */}
+            {currentLevel === "subjects" && (
+              <section>
+                <div className="mb-6">
+                  <p className="text-sm font-semibold text-indigo-600">
+                    Class {classNo}
+                  </p>
+
+                  <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
+                    Select Subject
+                  </h2>
+
+                  <p className="mt-2 text-sm text-slate-500">
+                    Choose a subject to view its chapters.
+                  </p>
+                </div>
+
+                {subjects.length === 0 ? (
+                  <EmptyState message="Is class ke liye abhi subjects available nahi hain." />
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {subjects.map((item, index) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => selectSubject(item)}
+                        className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-lg"
+                      >
+                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${
+                          subjectStyles[index % subjectStyles.length]
+                        } text-white`}>
+                          <BookOpen size={24} />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-extrabold text-slate-900">
+                            {item}
                           </h3>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {getSubjectCount(item)} Notes Available
+                          </p>
+                        </div>
 
-                          <p className="mt-2 text-sm text-slate-500">
-                            {getClassCount(number)} Study Notes
+                        <ArrowRight
+                          size={19}
+                          className="text-slate-400 transition group-hover:text-indigo-600"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* LEVEL 3: CHAPTERS */}
+            {currentLevel === "chapters" && (
+              <section>
+                <div className="mb-6">
+                  <p className="text-sm font-semibold text-indigo-600">
+                    Class {classNo} / {subject}
+                  </p>
+
+                  <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
+                    Select Chapter
+                  </h2>
+
+                  <p className="mt-2 text-sm text-slate-500">
+                    Choose a chapter to view its study notes.
+                  </p>
+                </div>
+
+                {availableChapters.length === 0 ? (
+                  <EmptyState message="Is subject ke liye chapters available nahi hain." />
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {availableChapters.map((item, index) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => selectChapter(item)}
+                        className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-lg"
+                      >
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                          <Layers3 size={23} />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                            Chapter {index + 1}
                           </p>
 
-                          <div className="mt-5 flex items-center justify-between text-sm font-bold text-indigo-600">
-                            Explore Class
-                            <ArrowRight size={17} />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
+                          <h3 className="mt-1 font-extrabold text-slate-900">
+                            {item}
+                          </h3>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            {getNoteCount(item)} Notes Available
+                          </p>
+                        </div>
+
+                        <ChevronRight
+                          size={20}
+                          className="text-slate-400 transition group-hover:text-indigo-600"
+                        />
+                      </button>
+                    ))}
+                  </div>
                 )}
+              </section>
+            )}
 
-                {/* LEVEL 2: SUBJECTS */}
-                {currentLevel === "subjects" && (
-                  <section>
-                    <div className="mb-6">
-                      <p className="text-sm font-semibold text-indigo-600">
-                        Class {classNo}
-                      </p>
+            {/* LEVEL 4: NOTES */}
+            {currentLevel === "notes" && (
+              <section>
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-indigo-600">
+                      Class {classNo} / {subject}
+                    </p>
 
-                      <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
-                        Select Subject
-                      </h2>
+                    <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
+                      {chapter}
+                    </h2>
 
-                      <p className="mt-2 text-sm text-slate-500">
-                        Choose a subject to view its chapters.
-                      </p>
-                    </div>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Study material for this chapter.
+                    </p>
+                  </div>
 
-                    {subjects.length === 0 ? (
-                      <EmptyState message="Is class ke liye abhi subjects available nahi hain." />
-                    ) : (
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {subjects.map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() => selectSubject(item)}
-                            className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-lg"
-                          >
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
-                              <BookOpen size={24} />
-                            </div>
+                  <span className="rounded-full bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700">
+                    {selectedNotes.length} Notes
+                  </span>
+                </div>
 
-                            <div className="min-w-0 flex-1">
-                              <h3 className="font-extrabold text-slate-900">
-                                {item}
-                              </h3>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {getSubjectCount(item)} Notes Available
-                              </p>
-                            </div>
-
-                            <ArrowRight
-                              size={19}
-                              className="text-slate-400 transition group-hover:text-indigo-600"
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </section>
+                {selectedNotes.length === 0 ? (
+                  <EmptyState message="Is chapter ke notes abhi upload nahi hue hain." />
+                ) : (
+                  <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    {selectedNotes.map((note) => (
+                      <NoteCard key={note._id} note={note} />
+                    ))}
+                  </div>
                 )}
-
-                {/* LEVEL 3: CHAPTERS */}
-                {currentLevel === "chapters" && (
-                  <section>
-                    <div className="mb-6">
-                      <p className="text-sm font-semibold text-indigo-600">
-                        Class {classNo} / {subject}
-                      </p>
-
-                      <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
-                        Select Chapter
-                      </h2>
-
-                      <p className="mt-2 text-sm text-slate-500">
-                        Choose a chapter to view its study notes.
-                      </p>
-                    </div>
-
-                    {availableChapters.length === 0 ? (
-                      <EmptyState message="Is subject ke liye chapters available nahi hain." />
-                    ) : (
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {availableChapters.map((item, index) => {
-                          const count = getNoteCount(
-                            notes,
-                            classNo,
-                            subject,
-                            item
-                          );
-
-                          return (
-                            <button
-                              key={item}
-                              type="button"
-                              onClick={() => selectChapter(item)}
-                              className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-lg"
-                            >
-                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                                <Layers3 size={23} />
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                                  Chapter {index + 1}
-                                </p>
-
-                                <h3 className="mt-1 font-extrabold text-slate-900">
-                                  {item}
-                                </h3>
-
-                                <p className="mt-1 text-xs text-slate-500">
-                                  {count} Notes Available
-                                </p>
-                              </div>
-
-                              <ChevronRight
-                                size={20}
-                                className="text-slate-400 transition group-hover:text-indigo-600"
-                              />
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </section>
-                )}
-
-                {/* LEVEL 4: NOTES */}
-                {currentLevel === "notes" && (
-                  <section>
-                    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-indigo-600">
-                          Class {classNo} / {subject}
-                        </p>
-
-                        <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
-                          {chapter}
-                        </h2>
-
-                        <p className="mt-2 text-sm text-slate-500">
-                          Study material for this chapter.
-                        </p>
-                      </div>
-
-                      <span className="rounded-full bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700">
-                        {selectedNotes.length} Notes
-                      </span>
-                    </div>
-
-                    {selectedNotes.length === 0 ? (
-                      <EmptyState message="Is chapter ke notes abhi upload nahi hue hain." />
-                    ) : (
-                      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                        {selectedNotes.map((note) => (
-                          <NoteCard key={note._id} note={note} />
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                )}
-              </>
+              </section>
             )}
           </>
         )}
 
-        {/* Footer */}
+        {/* Learning notice */}
+        {!loading && !error && (
+          <div className="mt-10 flex items-start gap-3 rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
+            <ShieldCheck
+              size={20}
+              className="mt-0.5 shrink-0 text-indigo-600"
+            />
+            <div>
+              <p className="text-sm font-bold text-indigo-900">
+                Your learning space
+              </p>
+              <p className="mt-1 text-xs leading-5 text-indigo-800">
+                Free notes are available to students. Premium learning
+                material requires an active membership for the relevant class.
+              </p>
+            </div>
+          </div>
+        )}
+
         <footer className="mt-12 border-t border-slate-200 py-6 text-center text-xs text-slate-400">
           © {new Date().getFullYear()} Aao Padai Kare. All rights reserved.
         </footer>
       </div>
     </main>
-  );
-}
-
-// Empty state component
-function EmptyState({ message }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-16 text-center">
-      <FolderOpen
-        className="mx-auto mb-4 text-slate-400"
-        size={45}
-      />
-
-      <h3 className="text-lg font-bold text-slate-800">
-        No Content Available
-      </h3>
-
-      <p className="mt-2 text-sm text-slate-500">
-        {message}
-      </p>
-    </div>
   );
 }

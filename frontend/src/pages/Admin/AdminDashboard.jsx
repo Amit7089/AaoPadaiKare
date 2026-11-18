@@ -17,7 +17,13 @@ import {
   ChevronRight,
   ShieldCheck,
   Sparkles,
+  Video,
+  ClipboardList,
+  Pencil,
+  BarChart3,
+  Trophy,
 } from "lucide-react";
+
 import { clearAdminToken } from "../../services/api";
 
 const API_URL =
@@ -73,6 +79,11 @@ export default function AdminDashboard() {
     loadDashboard();
   }, []);
 
+  // Close mobile sidebar when route changes
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
   // Dashboard statistics
   const totalClasses = new Set(
     syllabus.map((item) => item.classNo).filter(Boolean)
@@ -98,7 +109,7 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to logout?")) {
       clearAdminToken();
-      navigate("/admin/login");
+      navigate("/admin/login", { replace: true });
     }
   };
 
@@ -151,13 +162,49 @@ export default function AdminDashboard() {
       path: "/admin/notes",
       icon: FileText,
     },
+    {
+      name: "Question Papers",
+      path: "/admin/question-papers",
+      icon: FileText,
+    },
+    {
+      name: "Competitive Courses",
+      path: "/admin/courses",
+      icon: Trophy,
+    },
+    {
+      name: "Live Classes",
+      path: "/admin/live-classes",
+      icon: Video,
+    },
+    {
+      name: "Quiz Management",
+      path: "/admin/quizzes",
+      icon: ClipboardList,
+    },
+    {
+      name: "Analytics",
+      path: "/admin/analytics",
+      icon: BarChart3,
+    },
   ];
+
+  // Active navigation helper
+  const isActive = (path) => {
+    if (path === "/admin/dashboard") {
+      return location.pathname === path;
+    }
+
+    return (
+      location.pathname === path ||
+      location.pathname.startsWith(`${path}/`)
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] text-slate-800 md:flex">
-
-      {/* Mobile Header */}
-      <div className="flex items-center justify-between bg-[#101d3a] p-4 text-white md:hidden">
+      {/* MOBILE HEADER */}
+      <div className="sticky top-0 z-30 flex items-center justify-between bg-[#101d3a] p-4 text-white md:hidden">
         <h1 className="text-lg font-black">Aao Padai Kare</h1>
 
         <button
@@ -168,7 +215,7 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* MOBILE SIDEBAR OVERLAY */}
       {sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(false)}
@@ -177,13 +224,13 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Sidebar */}
+      {/* SIDEBAR */}
       <aside
         className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col bg-[#101d3a] text-white transition-transform duration-300 md:sticky md:top-0 md:h-screen md:w-64 md:shrink-0 md:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Logo */}
+        {/* LOGO */}
         <div className="flex h-20 shrink-0 items-center gap-3 border-b border-white/10 px-6">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-xl font-black">
             A
@@ -199,12 +246,13 @@ export default function AdminDashboard() {
           <button
             className="ml-auto md:hidden"
             onClick={() => setSidebarOpen(false)}
+            aria-label="Close menu"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Navigation */}
+        {/* NAVIGATION */}
         <div className="flex-1 overflow-y-auto px-5 pt-8">
           <p className="mb-4 px-3 text-[10px] font-bold tracking-[2px] text-slate-500">
             MAIN MENU
@@ -213,7 +261,7 @@ export default function AdminDashboard() {
           <nav className="space-y-2">
             {menu.map((item) => {
               const Icon = item.icon;
-              const active = location.pathname === item.path;
+              const active = isActive(item.path);
 
               return (
                 <Link
@@ -238,7 +286,7 @@ export default function AdminDashboard() {
           </nav>
         </div>
 
-        {/* Sidebar Bottom */}
+        {/* SIDEBAR BOTTOM */}
         <div className="shrink-0 p-5">
           <div className="mb-4 rounded-2xl border border-white/10 bg-white/5 p-4">
             <ShieldCheck className="mb-2 text-blue-400" size={23} />
@@ -268,10 +316,9 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* MAIN CONTENT */}
       <main className="min-w-0 flex-1">
-
-        {/* Topbar */}
+        {/* TOPBAR */}
         <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-200 bg-white/90 px-5 backdrop-blur-lg sm:px-8">
           <div>
             <p className="text-xs font-semibold text-slate-400">
@@ -310,8 +357,7 @@ export default function AdminDashboard() {
         </header>
 
         <div className="mx-auto max-w-7xl space-y-8 p-5 sm:p-8">
-
-          {/* Welcome Banner */}
+          {/* WELCOME BANNER */}
           <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#142b59] via-[#174b9c] to-[#2563eb] p-7 text-white shadow-xl shadow-blue-900/10 sm:p-10">
             <div className="relative z-10 max-w-xl">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold">
@@ -328,13 +374,23 @@ export default function AdminDashboard() {
                 place. Keep learning simple with Aao Padai Kare.
               </p>
 
-              <Link
-                to="/admin/notes"
-                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-blue-800 transition hover:bg-blue-50"
-              >
-                Manage Study Notes
-                <ArrowUpRight size={17} />
-              </Link>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link
+                  to="/admin/notes"
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-blue-800 transition hover:bg-blue-50"
+                >
+                  Manage Study Notes
+                  <ArrowUpRight size={17} />
+                </Link>
+
+                <Link
+                  to="/admin/question-papers"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/20"
+                >
+                  Manage Question Papers
+                  <ArrowUpRight size={17} />
+                </Link>
+              </div>
             </div>
 
             <div className="pointer-events-none absolute -right-12 -top-20 h-72 w-72 rounded-full border-[35px] border-white/10" />
@@ -344,14 +400,14 @@ export default function AdminDashboard() {
             <BookOpen className="pointer-events-none absolute bottom-7 right-10 hidden h-28 w-28 rotate-12 text-white/10 sm:block" />
           </section>
 
-          {/* Error */}
+          {/* ERROR */}
           {error && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               {error}
             </div>
           )}
 
-          {/* Statistics */}
+          {/* STATISTICS */}
           <section>
             <div className="mb-5 flex items-center justify-between">
               <div>
@@ -401,7 +457,7 @@ export default function AdminDashboard() {
             </div>
           </section>
 
-          {/* Quick Actions */}
+          {/* QUICK ACTIONS */}
           <section>
             <h3 className="text-xl font-extrabold">Quick Actions</h3>
 
@@ -410,8 +466,7 @@ export default function AdminDashboard() {
             </p>
 
             <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-
-              {/* Add Notes */}
+              {/* ADD NOTES */}
               <Link
                 to="/admin/notes"
                 className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-md"
@@ -435,7 +490,31 @@ export default function AdminDashboard() {
                 <ArrowUpRight className="text-slate-300 transition group-hover:text-blue-600" />
               </Link>
 
-              {/* Syllabus Management */}
+              {/* QUESTION PAPERS */}
+              <Link
+                to="/admin/question-papers"
+                className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-md"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                    <FileText size={26} />
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-slate-800">
+                      Manage Question Papers
+                    </h4>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Upload previous year and solved papers.
+                    </p>
+                  </div>
+                </div>
+
+                <ArrowUpRight className="text-slate-300 transition group-hover:text-amber-600" />
+              </Link>
+
+              {/* SYLLABUS MANAGEMENT */}
               <Link
                 to="/admin/syllabus"
                 className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-orange-300 hover:shadow-md"
@@ -459,7 +538,7 @@ export default function AdminDashboard() {
                 <ArrowUpRight className="text-slate-300 transition group-hover:text-orange-600" />
               </Link>
 
-              {/* View Classes */}
+              {/* VIEW CLASSES */}
               <Link
                 to="/classes"
                 className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-md"
@@ -482,10 +561,130 @@ export default function AdminDashboard() {
 
                 <ArrowUpRight className="text-slate-300 transition group-hover:text-violet-600" />
               </Link>
+
+              {/* LIVE CLASSES */}
+              <Link
+                to="/admin/live-classes"
+                className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-emerald-300 hover:shadow-md"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                    <Video size={26} />
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-slate-800">
+                      Manage Live Classes
+                    </h4>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Schedule and manage online classes.
+                    </p>
+                  </div>
+                </div>
+
+                <ArrowUpRight className="text-slate-300 transition group-hover:text-emerald-600" />
+              </Link>
+
+              {/* CREATE QUIZ SHORTCUT */}
+              <Link
+                to="/admin/quizzes?tab=create"
+                className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                    <Plus size={26} />
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-slate-800">
+                      Create Quiz
+                    </h4>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Create a new online test.
+                    </p>
+                  </div>
+                </div>
+
+                <ArrowUpRight className="text-slate-300 transition group-hover:text-indigo-600" />
+              </Link>
+
+              {/* MANAGE QUIZZES */}
+              <Link
+                to="/admin/quizzes?tab=manage"
+                className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-purple-300 hover:shadow-md"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
+                    <Pencil size={26} />
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-slate-800">
+                      Manage Quizzes
+                    </h4>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      View, publish and manage existing tests.
+                    </p>
+                  </div>
+                </div>
+
+                <ArrowUpRight className="text-slate-300 transition group-hover:text-purple-600" />
+              </Link>
+
+              {/* COMPETITIVE COURSES */}
+              <Link
+                to="/admin/courses"
+                className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-rose-300 hover:shadow-md"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+                    <Trophy size={26} />
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-slate-800">
+                      Manage Competitive Courses
+                    </h4>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Add NMMS, Navodaya, Model School and other exam courses.
+                    </p>
+                  </div>
+                </div>
+
+                <ArrowUpRight className="text-slate-300 transition group-hover:text-rose-600" />
+              </Link>
+
+              {/* ANALYTICS DASHBOARD */}
+              <Link
+                to="/admin/analytics"
+                className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-cyan-300 hover:shadow-md"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-600">
+                    <BarChart3 size={26} />
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-slate-800">
+                      Analytics Dashboard
+                    </h4>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      View students, results and performance reports.
+                    </p>
+                  </div>
+                </div>
+
+                <ArrowUpRight className="text-slate-300 transition group-hover:text-cyan-600" />
+              </Link>
             </div>
           </section>
 
-          {/* Recent Notes */}
+          {/* RECENT NOTES */}
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-6">
               <div>
@@ -587,7 +786,7 @@ export default function AdminDashboard() {
             )}
           </section>
 
-          {/* Footer */}
+          {/* FOOTER */}
           <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 py-5 text-xs text-slate-400">
             <p>
               © {new Date().getFullYear()} Aao Padai Kare. All rights reserved.

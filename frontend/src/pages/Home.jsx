@@ -1,313 +1,490 @@
 
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowRight,
-  BookOpen,
-  CheckCircle2,
-  GraduationCap,
-  NotebookPen,
-  PlayCircle,
-  Sparkles,
-  Target,
-  Trophy,
-  ClipboardCheck,
-  BookMarked,
-  Lightbulb,
+  ArrowUpRight, ArrowRight, BookOpen, GraduationCap, Sparkles,
+  Trophy, Brain, PlayCircle, ClipboardCheck, Atom, Calculator,
+  Languages, Clock3, Zap, Target, MoveUpRight, ChevronRight,
+  Star, Lightbulb, Rocket, BookMarked
 } from "lucide-react";
+import { api } from "../services/api";
 
 const classes = [
-  { number: 6, label: "Class 6", color: "from-sky-500 to-blue-600" },
-  { number: 7, label: "Class 7", color: "from-violet-500 to-purple-600" },
-  { number: 8, label: "Class 8", color: "from-pink-500 to-rose-600" },
-  { number: 9, label: "Class 9", color: "from-amber-500 to-orange-600" },
-  { number: 10, label: "Class 10", color: "from-emerald-500 to-green-600" },
-  { number: 11, label: "Class 11", color: "from-cyan-500 to-teal-600" },
-  { number: 12, label: "Class 12", color: "from-indigo-500 to-blue-700" },
+  { n: 6, title: "कक्षा 06", label: "शुरुआत यहीं से", color: "#22D3EE" },
+  { n: 7, title: "कक्षा 07", label: "सीखने का सफर", color: "#A78BFA" },
+  { n: 8, title: "कक्षा 08", label: "मजबूत आधार", color: "#F472B6" },
+  { n: 9, title: "कक्षा 09", label: "नई चुनौतियाँ", color: "#FBBF24" },
+  { n: 10, title: "कक्षा 10", label: "बोर्ड की तैयारी", color: "#34D399" },
+  { n: 11, title: "कक्षा 11", label: "नई दिशा", color: "#60A5FA" },
+  { n: 12, title: "कक्षा 12", label: "लक्ष्य की ओर", color: "#C084FC" },
 ];
 
-const features = [
+const categories = {
+  scholarship: "छात्रवृत्ति",
+  "school-entrance": "प्रवेश परीक्षा",
+  olympiad: "ओलंपियाड",
+  foundation: "फाउंडेशन",
+  other: "प्रतियोगी परीक्षा",
+};
+
+const tools = [
   {
-    icon: BookMarked,
-    title: "Chapter-wise Notes",
-    description:
-      "Topics ko aasaan language mein samjho aur revision ke liye notes padho.",
-    color: "bg-indigo-100 text-indigo-700",
+    no: "01",
+    icon: BookOpen,
+    title: "नोट्स और किताबें",
+    desc: "हर विषय की अध्यायवार अध्ययन सामग्री",
+    link: "/classes",
+    color: "text-cyan-300",
+    glow: "bg-cyan-400/10",
   },
   {
-    icon: ClipboardCheck,
-    title: "MCQ Practice",
-    description:
-      "Apni preparation check karo aur practice ke saath confidence badhao.",
-    color: "bg-emerald-100 text-emerald-700",
+    no: "02",
+    icon: Brain,
+    title: "टेस्ट और क्विज़",
+    desc: "प्रश्न हल करें और अपनी तैयारी जाँचें",
+    link: "/quiz",
+    color: "text-violet-300",
+    glow: "bg-violet-400/10",
   },
   {
+    no: "03",
     icon: PlayCircle,
-    title: "Video Learning",
-    description:
-      "Difficult topics ko step-by-step samajhne ke liye video lessons dekho.",
-    color: "bg-orange-100 text-orange-700",
-  },
-  {
-    icon: Trophy,
-    title: "Exam Preparation",
-    description:
-      "Important questions aur regular practice ke saath exam ki taiyari karo.",
-    color: "bg-pink-100 text-pink-700",
+    title: "वीडियो लर्निंग",
+    desc: "कठिन विषयों को आसान तरीके से समझें",
+    link: "/classes",
+    color: "text-emerald-300",
+    glow: "bg-emerald-400/10",
   },
 ];
+
+function Eyebrow({ children }) {
+  return (
+    <div className="mb-4 flex items-center gap-3 text-[10px] font-black tracking-[0.24em] text-cyan-300 sm:text-xs">
+      <span className="h-px w-8 bg-cyan-400" />
+      {children}
+    </div>
+  );
+}
 
 export default function Home() {
-  return (
-    <main className="overflow-hidden">
-      {/* HERO */}
-      <section className="relative bg-gradient-to-br from-indigo-50 via-white to-sky-50">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-indigo-100/70 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 left-0 h-72 w-72 rounded-full bg-sky-100/70 blur-3xl" />
+  const [courses, setCourses] = useState([]);
+  const [coursesLoading, setCoursesLoading] = useState(true);
 
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-2 lg:px-8 lg:py-24">
-          <div>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white px-4 py-2 text-sm font-bold text-indigo-700 shadow-sm">
-              <Sparkles size={16} />
-              Smart learning for MP Board students
+  useEffect(() => {
+    let active = true;
+
+    const loadCourses = async () => {
+      try {
+        const response = await api.getCourses();
+        if (active) {
+          setCourses(
+            Array.isArray(response?.courses)
+              ? response.courses.slice(0, 3)
+              : []
+          );
+        }
+      } catch (error) {
+        console.error("Courses loading error:", error);
+        if (active) setCourses([]);
+      } finally {
+        if (active) setCoursesLoading(false);
+      }
+    };
+
+    loadCourses();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return (
+    <main className="overflow-hidden bg-[#070B14] text-white">
+
+      {/* HERO: CINEMATIC INTRO */}
+      <section className="relative isolate min-h-[720px] overflow-hidden bg-[#080D19]">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-40 top-0 h-[500px] w-[500px] rounded-full bg-blue-600/20 blur-[150px]" />
+          <div className="absolute -right-40 top-10 h-[550px] w-[550px] rounded-full bg-violet-600/20 blur-[150px]" />
+          <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-cyan-500/10 blur-[120px]" />
+          <div
+            className="absolute inset-0 opacity-[0.055]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(148,163,184,.5) 1px, transparent 1px),linear-gradient(90deg,rgba(148,163,184,.5) 1px,transparent 1px)",
+              backgroundSize: "48px 48px",
+            }}
+          />
+        </div>
+
+        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-16 sm:px-8 sm:pt-24 lg:min-h-[690px] lg:grid-cols-[1.05fr_.95fr] lg:px-10 lg:py-20">
+
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/[0.07] px-4 py-2 text-[10px] font-bold text-cyan-200 sm:text-xs">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300 shadow-[0_0_12px_#22d3ee]" />
+              मध्य प्रदेश बोर्ड के विद्यार्थियों के लिए
+              <Sparkles size={14} />
             </div>
 
-            <h1 className="max-w-2xl text-4xl font-black leading-tight tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-              Padhai ab hogi
-              <span className="block bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
-                aur bhi aasaan!
+            <h1 className="mt-8 text-[44px] font-black leading-[1.13] tracking-tight sm:text-6xl lg:text-[76px]">
+              अब पढ़ाई
+              <span className="block bg-gradient-to-r from-cyan-300 via-blue-400 to-violet-400 bg-clip-text text-transparent">
+                होगी स्मार्ट।
+              </span>
+              <span className="mt-2 block text-white">
+                सपने होंगे साकार।
               </span>
             </h1>
 
-            <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 sm:text-lg">
-              Class 6 se 12 tak ke students ke liye notes, MCQ practice aur
-              exam preparation — sab kuch ek hi jagah.
+            <p className="mt-7 max-w-xl text-sm leading-8 text-slate-400 sm:text-base">
+              नोट्स, ऑनलाइन टेस्ट, वीडियो और प्रतियोगी परीक्षाओं की तैयारी।
+              आपकी पढ़ाई के लिए एक ऐसी डिजिटल जगह जहाँ सीखना बने आसान।
             </p>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/classes"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-bold text-white shadow-xl shadow-indigo-200 transition hover:-translate-y-1 hover:bg-indigo-700"
+                className="group inline-flex items-center justify-center gap-3 rounded-xl bg-cyan-300 px-7 py-4 text-sm font-black text-[#06111F] shadow-[0_0_35px_rgba(34,211,238,.22)] transition duration-300 hover:-translate-y-1 hover:bg-cyan-200 hover:shadow-[0_0_45px_rgba(34,211,238,.4)]"
               >
-                Apni Class Chune
-                <ArrowRight size={19} />
+                पढ़ाई शुरू करें
+                <ArrowUpRight size={18} className="transition group-hover:translate-x-1 group-hover:-translate-y-1" />
               </Link>
+
               <Link
                 to="/quiz"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-4 font-bold text-slate-700 shadow-sm transition hover:-translate-y-1 hover:border-indigo-200 hover:text-indigo-700"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-7 py-4 text-sm font-bold text-white transition hover:border-cyan-300/40 hover:bg-cyan-300/10"
               >
-                <PlayCircle size={19} />
-                Quiz Practice
+                <PlayCircle size={19} className="text-cyan-300" />
+                टेस्ट दें
               </Link>
             </div>
 
-            <div className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium text-slate-600">
+            <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-xs text-slate-500">
               <span className="flex items-center gap-2">
-                <CheckCircle2 size={18} className="text-emerald-600" />
-                Easy-to-understand learning
+                <GraduationCap size={16} className="text-cyan-300" />
+                कक्षा 6 से 12
               </span>
               <span className="flex items-center gap-2">
-                <CheckCircle2 size={18} className="text-emerald-600" />
-                Classes 6–12
+                <Languages size={16} className="text-violet-300" />
+                हिंदी और अंग्रेज़ी
+              </span>
+              <span className="flex items-center gap-2">
+                <Zap size={16} className="text-amber-300" />
+                अपनी गति से सीखें
               </span>
             </div>
           </div>
 
-          {/* Hero illustration */}
-          <div className="relative mx-auto w-full max-w-lg">
-            <div className="absolute inset-5 rounded-[2.5rem] bg-indigo-200/60 blur-2xl" />
-            <div className="relative rounded-[2rem] border border-white bg-white p-5 shadow-2xl shadow-indigo-100 sm:p-7">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-500">
-                    Your learning space
-                  </p>
-                  <h2 className="mt-1 text-xl font-extrabold text-slate-900">
-                    Aaj kya seekhenge?
-                  </h2>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
-                  <GraduationCap size={27} />
-                </div>
-              </div>
+          {/* RIGHT VISUAL - KNOWLEDGE ORBIT */}
+          <div className="relative mx-auto flex min-h-[400px] w-full max-w-[530px] items-center justify-center sm:min-h-[510px]">
 
-              <div className="mt-6 rounded-3xl bg-gradient-to-br from-indigo-600 to-blue-600 p-6 text-white">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold">
-                      LEARN • PRACTICE • GROW
-                    </span>
-                    <h3 className="mt-5 text-2xl font-black">
-                      Small steps,
-                      <br />
-                      big success!
-                    </h3>
-                    <p className="mt-2 text-sm text-indigo-100">
-                      Har din thoda behtar bano.
-                    </p>
-                  </div>
-                  <div className="hidden rounded-2xl bg-white/15 p-3 sm:block">
-                    <Lightbulb size={36} />
-                  </div>
-                </div>
-                <div className="mt-6 flex items-center gap-2">
-                  <div className="h-2 flex-1 rounded-full bg-white/25">
-                    <div className="h-2 w-3/5 rounded-full bg-amber-300" />
-                  </div>
-                  <span className="text-xs font-bold">Keep going!</span>
-                </div>
-              </div>
+            <div className="absolute h-[280px] w-[280px] rounded-full bg-cyan-400/10 blur-[80px] sm:h-[380px] sm:w-[380px]" />
 
-              <div className="mt-5 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
-                    <NotebookPen size={21} />
-                  </div>
-                  <p className="mt-3 font-bold text-slate-900">Quick Notes</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Revise smartly
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                    <Target size={21} />
-                  </div>
-                  <p className="mt-3 font-bold text-slate-900">Practice Quiz</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Test your knowledge
-                  </p>
-                </div>
-              </div>
+            <div className="absolute h-[300px] w-[300px] animate-[spin_35s_linear_infinite] rounded-full border border-dashed border-cyan-300/20 sm:h-[420px] sm:w-[420px]" />
+            <div className="absolute h-[230px] w-[230px] animate-[spin_28s_linear_infinite_reverse] rounded-full border border-violet-300/20 sm:h-[330px] sm:w-[330px]" />
+
+            <div className="relative z-10 flex h-[220px] w-[220px] flex-col items-center justify-center rounded-full border border-cyan-300/30 bg-gradient-to-br from-[#17365A] via-[#14213D] to-[#17122F] shadow-[0_0_80px_rgba(34,211,238,.15)] sm:h-[285px] sm:w-[285px]">
+              <div className="absolute inset-3 rounded-full border border-white/[0.08]" />
+              <GraduationCap size={42} className="mb-3 text-cyan-300 sm:h-12 sm:w-12" />
+              <p className="text-[10px] font-bold tracking-[0.3em] text-cyan-200">AAO PADAI KARE</p>
+              <p className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">ज्ञान</p>
+              <p className="mt-2 text-xs text-slate-400">सीखें • समझें • बढ़ें</p>
             </div>
 
-            <div className="absolute -left-4 top-24 hidden items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-xl sm:flex">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                <CheckCircle2 size={22} />
-              </span>
-              <span>
-                <span className="block text-sm font-extrabold text-slate-900">
-                  Learn daily
-                </span>
-                <span className="text-xs text-slate-500">Grow confidently</span>
-              </span>
+            {/* Orbiting icons */}
+            <div className="absolute left-[7%] top-[18%] flex h-12 w-12 animate-bounce items-center justify-center rounded-2xl border border-cyan-300/20 bg-[#101D32] text-cyan-300 shadow-xl shadow-cyan-500/10 sm:h-14 sm:w-14">
+              <Atom size={26} />
             </div>
+            <div className="absolute right-[6%] top-[18%] flex h-12 w-12 animate-[bounce_4s_infinite] items-center justify-center rounded-2xl border border-violet-300/20 bg-[#19152F] text-violet-300 shadow-xl shadow-violet-500/10 sm:h-14 sm:w-14">
+              <Calculator size={26} />
+            </div>
+            <div className="absolute bottom-[15%] left-[9%] flex h-12 w-12 animate-[bounce_3s_infinite] items-center justify-center rounded-2xl border border-amber-300/20 bg-[#241E2C] text-amber-300 shadow-xl shadow-amber-500/10 sm:h-14 sm:w-14">
+              <Lightbulb size={26} />
+            </div>
+            <div className="absolute bottom-[14%] right-[8%] flex h-12 w-12 animate-[bounce_5s_infinite] items-center justify-center rounded-2xl border border-emerald-300/20 bg-[#10251F] text-emerald-300 shadow-xl shadow-emerald-500/10 sm:h-14 sm:w-14">
+              <Trophy size={26} />
+            </div>
+
+            {/* Floating info */}
+            <div className="absolute left-0 top-[46%] hidden -translate-x-2 rounded-xl border border-white/10 bg-[#111B2D]/90 p-3 shadow-xl backdrop-blur sm:block">
+              <div className="flex items-center gap-2">
+                <BookOpen size={17} className="text-cyan-300" />
+                <span className="text-[11px] font-bold">अध्ययन सामग्री</span>
+              </div>
+            </div>
+            <div className="absolute right-0 top-[48%] hidden translate-x-2 rounded-xl border border-white/10 bg-[#111B2D]/90 p-3 shadow-xl backdrop-blur sm:block">
+              <div className="flex items-center gap-2">
+                <Brain size={17} className="text-violet-300" />
+                <span className="text-[11px] font-bold">स्मार्ट अभ्यास</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom metrics strip */}
+        <div className="relative border-t border-white/[0.07] bg-white/[0.02]">
+          <div className="mx-auto grid max-w-7xl grid-cols-3 divide-x divide-white/[0.08] px-5 py-5 sm:px-8 lg:px-10">
+            {[
+              ["07", "कक्षाएँ"],
+              ["01", "डिजिटल पाठशाला"],
+              ["∞", "सीखने के अवसर"],
+            ].map(([value, label]) => (
+              <div key={label} className="px-2 text-center">
+                <p className="text-xl font-black text-cyan-300 sm:text-2xl">{value}</p>
+                <p className="mt-1 text-[10px] text-slate-500 sm:text-xs">{label}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* CLASSES */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-indigo-600">
-              Start learning
-            </p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-              Apni class chune
-            </h2>
-            <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-              Apni class select karo aur apne learning resources explore karo.
-            </p>
-          </div>
-          <Link
-            to="/classes"
-            className="inline-flex items-center gap-2 font-bold text-indigo-700 hover:text-indigo-900"
-          >
-            All Classes <ArrowRight size={18} />
-          </Link>
-        </div>
+      {/* CLASS SELECTOR - HORIZONTAL NUMBER WALL */}
+      <section className="relative py-20 sm:py-28">
+        <div className="pointer-events-none absolute right-0 top-10 h-72 w-72 rounded-full bg-violet-600/[0.08] blur-[110px]" />
 
-        <div className="mt-9 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {classes.map((item) => (
-            <Link
-              key={item.number}
-              to={`/classes/${item.number}`}
-              className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-1.5 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-100 sm:p-6"
-            >
-              <div
-                className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${item.color} text-white shadow-lg transition group-hover:scale-110`}
-              >
-                <BookOpen size={27} />
-              </div>
-              <h3 className="mt-5 text-lg font-extrabold text-slate-900">
-                {item.label}
-              </h3>
-              <p className="mt-1 text-sm text-slate-500">Explore study material</p>
-              <div className="mt-5 flex items-center justify-between">
-                <span className="text-sm font-bold text-indigo-700">
-                  Start learning
-                </span>
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition group-hover:bg-indigo-600 group-hover:text-white">
-                  <ArrowRight size={17} />
-                </span>
-              </div>
+        <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
+            <div>
+              <Eyebrow>अपनी कक्षा चुनें</Eyebrow>
+              <h2 className="text-3xl font-black sm:text-5xl">
+                आपका अगला <span className="text-cyan-300">कदम।</span>
+              </h2>
+              <p className="mt-4 text-sm text-slate-400">
+                जिस कक्षा में पढ़ते हैं, वहीं से अपनी यात्रा शुरू करें।
+              </p>
+            </div>
+            <Link to="/classes" className="mb-1 inline-flex items-center gap-2 text-sm font-bold text-cyan-300 transition hover:text-white">
+              सभी कक्षाएँ <ArrowRight size={17} />
             </Link>
-          ))}
+          </div>
+
+          <div className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+            {classes.map((item, index) => (
+              <Link
+                key={item.n}
+                to={`/classes/${item.n}`}
+                className="group relative flex min-h-[180px] flex-col justify-between overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0D1423] p-4 transition duration-300 hover:-translate-y-2 hover:border-white/20 sm:min-h-[210px] sm:p-5"
+              >
+                <div
+                  className="absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-10 blur-2xl transition group-hover:opacity-30"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="relative text-[10px] font-bold text-slate-500">
+                  LEVEL {String(index + 1).padStart(2, "0")}
+                </span>
+                <div className="relative">
+                  <p
+                    className="text-4xl font-black tracking-tighter sm:text-5xl"
+                    style={{ color: item.color }}
+                  >
+                    {String(item.n).padStart(2, "0")}
+                  </p>
+                  <h3 className="mt-3 text-sm font-black text-white">{item.title}</h3>
+                  <p className="mt-1 text-[10px] text-slate-500">{item.label}</p>
+                </div>
+                <div className="relative flex items-center justify-between border-t border-white/[0.08] pt-3">
+                  <span className="text-[10px] font-bold text-slate-400">खोलें</span>
+                  <ArrowUpRight size={16} className="text-cyan-300 transition group-hover:-translate-y-1 group-hover:translate-x-1" />
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section className="border-y border-slate-100 bg-white py-16 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-indigo-600">
-              Everything in one place
-            </p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-              Padhai ke liye sab kuch
+      {/* LEARNING EXPERIENCE - SPLIT LAYOUT */}
+      <section className="border-y border-white/[0.06] bg-[#0B1220] py-20 sm:py-28">
+        <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:items-center lg:px-10">
+
+          <div>
+            <Eyebrow>आपकी पढ़ाई, आपके तरीके से</Eyebrow>
+            <h2 className="text-3xl font-black leading-tight sm:text-5xl">
+              सिर्फ पढ़ना नहीं,
+              <span className="mt-2 block text-violet-300">समझना भी जरूरी है।</span>
             </h2>
-            <p className="mt-4 leading-7 text-slate-600">
-              Concepts samjho, practice karo aur exam ke liye taiyar raho.
+            <p className="mt-6 max-w-md text-sm leading-8 text-slate-400">
+              पढ़ाई को छोटे और आसान चरणों में बाँटें। पढ़ें, अभ्यास करें और
+              अपनी तैयारी को लगातार बेहतर बनाएँ।
             </p>
+            <Link
+              to="/classes"
+              className="mt-8 inline-flex items-center gap-2 text-sm font-bold text-cyan-300 transition hover:gap-4"
+            >
+              पढ़ाई की शुरुआत करें <ArrowRight size={17} />
+            </Link>
+
+            <div className="mt-12 hidden grid-cols-2 gap-3 sm:grid">
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+                <BookMarked size={22} className="text-cyan-300" />
+                <p className="mt-4 text-sm font-bold">अध्यायवार नोट्स</p>
+                <p className="mt-1 text-xs text-slate-500">आसान अध्ययन</p>
+              </div>
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+                <Target size={22} className="text-violet-300" />
+                <p className="mt-4 text-sm font-bold">लक्ष्य आधारित तैयारी</p>
+                <p className="mt-1 text-xs text-slate-500">बेहतर अभ्यास</p>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {features.map((feature) => {
-              const Icon = feature.icon;
+          <div className="space-y-3">
+            {tools.map((tool, index) => {
+              const Icon = tool.icon;
               return (
-                <div
-                  key={feature.title}
-                  className="group rounded-3xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-slate-200/60"
+                <Link
+                  key={tool.no}
+                  to={tool.link}
+                  className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111A2B] p-5 transition duration-300 hover:translate-x-1 hover:border-cyan-300/30 hover:bg-[#152139] sm:gap-6 sm:p-7"
                 >
-                  <div
-                    className={`flex h-14 w-14 items-center justify-center rounded-2xl ${feature.color} transition group-hover:scale-110`}
-                  >
-                    <Icon size={26} />
+                  <span className="text-xs font-black text-slate-600">{tool.no}</span>
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${tool.glow} ${tool.color} sm:h-14 sm:w-14`}>
+                    <Icon size={25} />
                   </div>
-                  <h3 className="mt-5 text-lg font-extrabold text-slate-900">
-                    {feature.title}
-                  </h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
-                    {feature.description}
-                  </p>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base font-black text-white sm:text-lg">{tool.title}</h3>
+                    <p className="mt-1 text-xs text-slate-400 sm:text-sm">{tool.desc}</p>
+                  </div>
+                  <ArrowUpRight size={20} className="shrink-0 text-slate-500 transition group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:text-cyan-300" />
+                </Link>
               );
             })}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="px-4 py-16 sm:px-6 lg:px-8">
-        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-r from-indigo-700 via-indigo-600 to-blue-600 px-6 py-12 text-center text-white shadow-2xl shadow-indigo-200 sm:px-12 sm:py-16">
-          <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border-[35px] border-white/10" />
-          <div className="pointer-events-none absolute -bottom-28 -left-10 h-64 w-64 rounded-full border-[35px] border-white/10" />
-          <div className="relative">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-bold">
-              <Sparkles size={16} /> Your future starts today
+      {/* COMPETITIVE COURSES */}
+      {!coursesLoading && courses.length > 0 && (
+        <section className="relative overflow-hidden py-20 sm:py-28">
+          <div className="pointer-events-none absolute -left-32 top-20 h-80 w-80 rounded-full bg-blue-600/10 blur-[120px]" />
+          <div className="pointer-events-none absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-violet-600/10 blur-[120px]" />
+
+          <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <Eyebrow>सामान्य पढ़ाई से आगे</Eyebrow>
+                <h2 className="text-3xl font-black sm:text-5xl">
+                  बड़े लक्ष्य, <span className="text-violet-300">खास तैयारी।</span>
+                </h2>
+                <p className="mt-4 max-w-xl text-sm leading-7 text-slate-400">
+                  NMMS, नवोदय और दूसरी प्रतियोगी परीक्षाओं के लिए विशेष कोर्स।
+                </p>
+              </div>
+              <Link to="/student/courses" className="mb-1 inline-flex items-center gap-2 text-sm font-bold text-cyan-300 hover:text-white">
+                सभी कोर्स देखें <ArrowRight size={17} />
+              </Link>
+            </div>
+
+            <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {courses.map((course) => (
+                <Link
+                  key={course._id}
+                  to={`/student/courses/${encodeURIComponent(course.slug)}`}
+                  className="group overflow-hidden rounded-2xl border border-white/10 bg-[#10192A] transition duration-300 hover:-translate-y-2 hover:border-violet-300/30 hover:shadow-[0_20px_60px_rgba(124,58,237,.12)]"
+                >
+                  <div className="relative h-48 overflow-hidden bg-gradient-to-br from-blue-900 to-violet-950">
+                    {course.thumbnailUrl ? (
+                      <img
+                        src={course.thumbnailUrl}
+                        alt={course.title}
+                        loading="lazy"
+                        className="h-full w-full object-cover opacity-80 transition duration-700 group-hover:scale-110 group-hover:opacity-100"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <Trophy size={55} className="text-violet-300" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#10192A] to-transparent" />
+                    <span className="absolute left-4 top-4 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[10px] font-bold text-white backdrop-blur">
+                      {categories[course.category] || "प्रतियोगी परीक्षा"}
+                    </span>
+                    <span className="absolute bottom-4 right-4 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur transition group-hover:rotate-45 group-hover:bg-cyan-300 group-hover:text-slate-950">
+                      <MoveUpRight size={18} />
+                    </span>
+                  </div>
+
+                  <div className="p-5">
+                    <h3 className="text-lg font-black text-white transition group-hover:text-cyan-300">
+                      {course.title}
+                    </h3>
+                    <p className="mt-2 line-clamp-2 text-xs leading-6 text-slate-400">
+                      {course.shortDescription}
+                    </p>
+
+                    <div className="mt-5 flex flex-wrap gap-3 text-[10px] text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <Languages size={13} className="text-cyan-300" />
+                        {(course.supportedLanguages || []).join(" / ") || "Hindi"}
+                      </span>
+                      {course.durationDays > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Clock3 size={13} className="text-violet-300" />
+                          {course.durationDays} दिन
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-between border-t border-white/[0.08] pt-4">
+                      <div>
+                        {Number(course.price) > 0 ? (
+                          <>
+                            {Number(course.compareAtPrice) > Number(course.price) && (
+                              <span className="mr-2 text-xs text-slate-500 line-through">
+                                ₹{course.compareAtPrice}
+                              </span>
+                            )}
+                            <span className="text-xl font-black text-white">₹{course.price}</span>
+                          </>
+                        ) : (
+                          <span className="font-black text-emerald-300">निःशुल्क</span>
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-cyan-300">कोर्स देखें</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* FINAL CTA */}
+      <section className="relative overflow-hidden border-t border-white/[0.06] bg-[#0A1020] px-5 py-24 sm:px-8 sm:py-32 lg:px-10">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-600/10 blur-[130px]" />
+          <div className="absolute left-1/2 top-1/2 h-[330px] w-[330px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/[0.08]" />
+          <div className="absolute left-1/2 top-1/2 h-[450px] w-[450px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-violet-300/[0.07]" />
+        </div>
+
+        <div className="relative mx-auto max-w-4xl text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-300 shadow-[0_0_40px_rgba(34,211,238,.15)]">
+            <Rocket size={30} />
+          </div>
+
+          <Eyebrow>आपका भविष्य, आपकी मेहनत</Eyebrow>
+          <h2 className="mt-5 text-3xl font-black leading-tight sm:text-5xl lg:text-6xl">
+            आज सीखेंगे,
+            <span className="block bg-gradient-to-r from-cyan-300 to-violet-400 bg-clip-text text-transparent">
+              कल आगे बढ़ेंगे।
             </span>
-            <h2 className="mx-auto mt-5 max-w-3xl text-3xl font-black sm:text-4xl lg:text-5xl">
-              Aaj se apni padhai ko ek nayi direction do!
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl leading-7 text-indigo-100">
-              Apni class chuno, learning shuru karo aur har din apna confidence
-              badhao.
-            </p>
-            <Link
-              to="/classes"
-              className="mt-8 inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-7 py-4 font-extrabold text-indigo-700 shadow-lg transition hover:-translate-y-1 hover:bg-indigo-50"
-            >
-              Explore Classes <ArrowRight size={19} />
-            </Link>
+          </h2>
+          <p className="mx-auto mt-6 max-w-xl text-sm leading-8 text-slate-400 sm:text-base">
+            हर बड़ा लक्ष्य एक छोटे कदम से शुरू होता है। अपनी कक्षा चुनें और
+            आज ही अपनी पढ़ाई को नई दिशा दें।
+          </p>
+
+          <Link
+            to="/classes"
+            className="group mt-9 inline-flex items-center gap-3 rounded-xl bg-cyan-300 px-8 py-4 text-sm font-black text-[#07111F] shadow-[0_0_35px_rgba(34,211,238,.2)] transition hover:-translate-y-1 hover:bg-cyan-200 hover:shadow-[0_0_50px_rgba(34,211,238,.35)]"
+          >
+            चलिए पढ़ाई शुरू करें
+            <ArrowRight size={18} className="transition group-hover:translate-x-1" />
+          </Link>
+
+          <div className="mt-10 flex items-center justify-center gap-2 text-xs text-slate-500">
+            <Star size={14} className="fill-amber-300 text-amber-300" />
+            ज्ञान ही सबसे बड़ी शक्ति है
+            <Star size={14} className="fill-amber-300 text-amber-300" />
           </div>
         </div>
       </section>

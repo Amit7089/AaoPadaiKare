@@ -1,6 +1,6 @@
 
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   ArrowRight,
@@ -10,11 +10,18 @@ import {
   LoaderCircle,
   RefreshCw,
   BookMarked,
+  Crown,
+  ShieldCheck,
+  LockKeyhole,
+  CalendarDays,
+  Clock3,
+  Library,
+  Search,
 } from "lucide-react";
 
-import { api } from "../services/api";
+import { api, clearStudentToken } from "../services/api";
 
-const classes = [
+const allClasses = [
   {
     number: 6,
     color: "from-sky-500 to-blue-600",
@@ -52,40 +59,139 @@ const classes = [
   },
 ];
 
+function formatDate(date) {
+  if (!date) return "N/A";
+
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) return "N/A";
+
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getActiveMemberships(memberships = []) {
+  const now = Date.now();
+
+  return memberships.filter((membership) => {
+    const expiry = membership.expiresAt
+      ? new Date(membership.expiresAt).getTime()
+      : 0;
+
+    return (
+      membership.status === "active" &&
+      Number(membership.classNo) >= 6 &&
+      Number(membership.classNo) <= 12 &&
+      Number.isFinite(expiry) &&
+      expiry > now
+    );
+  });
+}
+
+function getResponseList(response) {
+  const data = response?.data;
+
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.syllabus)) return data.syllabus;
+
+  return [];
+}
+
 export default function Classes() {
+  const navigate = useNavigate();
+
+  const [student, setStudent] = useState(null);
   const [syllabus, setSyllabus] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadSyllabus() {
+  const loadClasses = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await api.getSyllabus();
+      const [studentResponse, syllabusResponse] = await Promise.all([
+        api.getStudent(),
+        api.getSyllabus(),
+      ]);
 
-      const syllabusData = Array.isArray(response.data)
-        ? response.data
-        : [];
+      const studentData =
+        studentResponse?.student ||
+        studentResponse?.data?.student ||
+        studentResponse?.data;
 
-      setSyllabus(syllabusData);
+      if (!studentData) {
+        throw new Error("Student profile nahi mil payi.");
+      }
+
+      setStudent(studentData);
+      setSyllabus(getResponseList(syllabusResponse));
     } catch (err) {
-      setError(err.message || "Syllabus load nahi ho paya.");
+      console.error("Load classes error:", err);
+
+      if (err.status === 401 || !localStorage.getItem("studentToken")) {
+        clearStudentToken();
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      setError(
+        err.message || "Classes load nahi ho payi. Please try again."
+      );
     } finally {
       setLoading(false);
     }
-  }
+  }, [navigate]);
 
   useEffect(() => {
-    loadSyllabus();
-  }, []);
+    loadClasses();
+  }, [loadClasses]);
+
+  // Only currently active memberships
+  const activeMemberships = useMemo(
+    () => getActiveMemberships(student?.memberships || []),
+    [student]
+  );
+
+  // One card per class, even if duplicate membership entries exist
+  const visibleClasses = useMemo(() => {
+    const activeNumbers = [
+      ...new Set(
+        activeMemberships.map((membership) =>
+          Number(membership.classNo)
+        )
+      ),
+    ];
+
+    return allClasses.filter((item) =>
+      activeNumbers.includes(item.number)
+    );
+  }, [activeMemberships]);
+
+  const getMembership = (classNo) => {
+    return activeMemberships
+      .filter(
+        (membership) => Number(membership.classNo) === classNo
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.expiresAt).getTime() -
+          new Date(a.expiresAt).getTime()
+      )[0];
+  };
 
   const getClassSubjects = (classNo) => {
     return [
       ...new Set(
         syllabus
-          .filter((item) => Number(item.classNo) === classNo)
-          .map((item) => item.subject)
+          .filter(
+            (item) => Number(item.classNo) === classNo
+          )
+          .map((item) => item.subject?.trim())
           .filter(Boolean)
       ),
     ];
@@ -97,198 +203,369 @@ export default function Classes() {
     ).length;
   };
 
-  return (
-    <main className="min-h-screen bg-slate-50">
+  // Loading state
+  if (loading) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-slate-50 px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50">
+            <LoaderCircle
+              size={34}
+              className="animate-spin text-indigo-600"
+            />
+          </div>
 
-      {/* HERO SECTION */}
-      <section className="bg-gradient-to-br from-indigo-50 via-white to-sky-50">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
+          <h2 className="mt-4 text-lg font-extrabold text-slate-800">
+            Loading your classes
+          </h2>
 
-          <span className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white px-4 py-2 text-sm font-bold text-indigo-700">
-            <Sparkles size={16} />
-            MP Board Learning
-          </span>
+          <p className="mt-1 text-sm text-slate-500">
+            Preparing your personal learning space...
+          </p>
+        </div>
+      </main>
+    );
+  }
 
-          <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">
-            Choose Your{" "}
-            <span className="text-indigo-600">Class</span>
-          </h1>
+  // Error state
+  if (error) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-slate-50 px-4">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <RefreshCw
+            size={38}
+            className="mx-auto text-red-500"
+          />
 
-          <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-            Class 6 se 12 tak apni class chuno. Apne subjects,
-            chapters aur study material explore karo.
+          <h2 className="mt-4 text-xl font-black text-slate-900">
+            Classes load nahi hui
+          </h2>
+
+          <p className="mt-2 text-sm text-slate-500">
+            {error}
           </p>
 
-          <div className="mt-7 flex flex-wrap gap-3">
-            <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 shadow-sm">
-              <GraduationCap size={20} className="text-indigo-600" />
-              <span className="text-sm font-bold text-slate-700">
-                7 Classes Available
-              </span>
+          <button
+            onClick={loadClasses}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
+          >
+            <RefreshCw size={17} />
+            Try Again
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-[#f5f7fc]">
+
+      {/* Hero section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#101d43] via-[#172554] to-[#263d83] text-white">
+        <div className="absolute -right-20 -top-28 h-80 w-80 rounded-full bg-indigo-400/20 blur-3xl" />
+        <div className="absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-blue-400/10 blur-3xl" />
+
+        <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold tracking-wider text-indigo-100">
+            <Sparkles size={15} />
+            MY LEARNING SPACE
+          </div>
+
+          <div className="mt-6 flex flex-col justify-between gap-7 md:flex-row md:items-end">
+            <div>
+              <p className="text-sm font-semibold text-blue-200">
+                Welcome back{student?.name ? `, ${student.name}` : ""}!
+              </p>
+
+              <h1 className="mt-2 text-3xl font-black sm:text-5xl">
+                My Classes
+              </h1>
+
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-indigo-100 sm:text-base">
+                Apni active membership wali class select karein,
+                syllabus explore karein aur chapter-wise padhai
+                shuru karein.
+              </p>
             </div>
 
-            <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 shadow-sm">
-              <BookOpen size={20} className="text-emerald-600" />
-              <span className="text-sm font-bold text-slate-700">
-                Chapter-wise Learning
-              </span>
+            <div className="grid w-full grid-cols-2 gap-3 sm:w-auto">
+              <div className="rounded-2xl border border-white/15 bg-white/10 p-4 sm:min-w-36">
+                <GraduationCap size={23} className="text-blue-200" />
+                <p className="mt-3 text-xs font-semibold text-indigo-100">
+                  ACTIVE CLASSES
+                </p>
+                <p className="mt-1 text-3xl font-black">
+                  {visibleClasses.length}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/15 bg-white/10 p-4 sm:min-w-36">
+                <BookOpen size={23} className="text-emerald-200" />
+                <p className="mt-3 text-xs font-semibold text-indigo-100">
+                  TOTAL CHAPTERS
+                </p>
+                <p className="mt-1 text-3xl font-black">
+                  {visibleClasses.reduce(
+                    (total, item) =>
+                      total + getChapterCount(item.number),
+                    0
+                  )}
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CLASSES SECTION */}
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      {/* Main classes section */}
+      <section className="mx-auto max-w-7xl px-4 py-9 sm:px-6 sm:py-12 lg:px-8">
 
-        <div className="mb-8">
-          <h2 className="text-2xl font-black text-slate-900">
-            Explore Your Classes
-          </h2>
+        <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <p className="text-xs font-black tracking-[0.16em] text-indigo-600">
+              YOUR MEMBERSHIPS
+            </p>
 
-          <p className="mt-2 text-sm text-slate-500">
-            Apni current class select karke syllabus aur study material dekhein.
-          </p>
-        </div>
+            <h2 className="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">
+              Your Learning Classes
+            </h2>
 
-        {/* LOADING */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <LoaderCircle
-              size={40}
-              className="animate-spin text-indigo-600"
-            />
-
-            <p className="mt-4 text-sm font-semibold text-slate-500">
-              Loading classes and syllabus...
+            <p className="mt-2 text-sm text-slate-500">
+              Select a class to explore its subjects and chapters.
             </p>
           </div>
-        ) : error ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
-            <p className="font-semibold text-red-700">{error}</p>
 
-            <button
-              onClick={loadSyllabus}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700"
-            >
-              <RefreshCw size={17} />
-              Try Again
-            </button>
+          <Link
+            to="/membership"
+            className="inline-flex w-fit items-center gap-2 rounded-xl border border-indigo-100 bg-white px-4 py-3 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+          >
+            <Crown size={17} />
+            Manage Membership
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+
+        {visibleClasses.length === 0 ? (
+          /* No active memberships */
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="px-6 py-12 text-center sm:px-12 sm:py-16">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-50 text-amber-600">
+                <LockKeyhole size={36} />
+              </div>
+
+              <h2 className="mt-6 text-2xl font-black text-slate-900">
+                Start Your Learning Journey
+              </h2>
+
+              <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-slate-500">
+                Abhi aapke account mein kisi class ki active
+                Premium Membership nahi hai. Apni class choose
+                karke membership activate karein aur complete
+                learning material access karein.
+              </p>
+
+              <div className="mx-auto mt-7 grid max-w-lg gap-3 text-left sm:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <ShieldCheck
+                    size={23}
+                    className="text-emerald-600"
+                  />
+                  <p className="mt-3 text-sm font-bold text-slate-800">
+                    Class-wise Access
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Har class ki membership alag rahegi.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <CalendarDays
+                    size={23}
+                    className="text-indigo-600"
+                  />
+                  <p className="mt-3 text-sm font-bold text-slate-800">
+                    Flexible Plans
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Monthly aur yearly plans available hain.
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                to="/membership"
+                className="mt-8 inline-flex items-center gap-2 rounded-xl bg-indigo-700 px-6 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-800"
+              >
+                <Crown size={18} />
+                Explore Membership Plans
+                <ArrowRight size={17} />
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-
-            {classes.map((item) => {
+            {visibleClasses.map((item) => {
               const subjects = getClassSubjects(item.number);
               const chapterCount = getChapterCount(item.number);
+              const membership = getMembership(item.number);
 
               return (
                 <Link
                   key={item.number}
                   to={`/classes/${item.number}`}
-                  className="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-100"
+                  className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-100/60"
                 >
-                  {/* CARD HEADER */}
-                  <div className="flex items-start justify-between">
+                  {/* Card banner */}
+                  <div
+                    className={`relative overflow-hidden bg-gradient-to-br ${item.color} p-6 text-white`}
+                  >
+                    <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10" />
 
-                    <div
-                      className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${item.color} text-white shadow-lg`}
-                    >
-                      <GraduationCap size={31} />
-                    </div>
+                    <div className="relative flex items-start justify-between">
+                      <div>
+                        <p className="text-xs font-bold tracking-widest text-white/75">
+                          MP BOARD
+                        </p>
 
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
-                      MP Board
-                    </span>
-                  </div>
-
-                  {/* CLASS TITLE */}
-                  <h3 className="mt-6 text-2xl font-black text-slate-900">
-                    Class {item.number}
-                  </h3>
-
-                  <p className="mt-2 min-h-12 text-sm leading-6 text-slate-600">
-                    {item.description}
-                  </p>
-
-                  {/* SUBJECT INFORMATION */}
-                  <div className="mt-5 grid grid-cols-2 gap-3">
-
-                    <div className="rounded-xl bg-indigo-50 p-3">
-                      <div className="flex items-center gap-2 text-indigo-600">
-                        <BookOpen size={17} />
-
-                        <span className="text-xs font-bold">
-                          Subjects
-                        </span>
+                        <h3 className="mt-3 text-3xl font-black">
+                          Class {item.number}
+                        </h3>
                       </div>
 
-                      <p className="mt-2 text-xl font-black text-indigo-700">
-                        {subjects.length}
-                      </p>
+                      <div className="rounded-2xl bg-white/20 p-3">
+                        <GraduationCap size={30} />
+                      </div>
                     </div>
 
-                    <div className="rounded-xl bg-emerald-50 p-3">
-                      <div className="flex items-center gap-2 text-emerald-600">
-                        <BookMarked size={17} />
-
-                        <span className="text-xs font-bold">
-                          Chapters
-                        </span>
-                      </div>
-
-                      <p className="mt-2 text-xl font-black text-emerald-700">
-                        {chapterCount}
-                      </p>
+                    <div className="relative mt-6 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-xs font-extrabold">
+                      <ShieldCheck size={14} />
+                      PREMIUM ACTIVE
                     </div>
                   </div>
 
-                  {/* SUBJECT PREVIEW */}
-                  <div className="mt-5">
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                      Available Subjects
+                  {/* Card body */}
+                  <div className="p-6">
+                    <p className="min-h-12 text-sm leading-6 text-slate-500">
+                      {item.description}
                     </p>
 
-                    {subjects.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {subjects.slice(0, 3).map((subject) => (
-                          <span
-                            key={subject}
-                            className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600"
-                          >
-                            {subject}
+                    <div className="mt-5 grid grid-cols-2 gap-3">
+                      <div className="rounded-xl bg-indigo-50 p-3">
+                        <div className="flex items-center gap-2 text-indigo-600">
+                          <BookOpen size={17} />
+                          <span className="text-xs font-bold">
+                            Subjects
                           </span>
-                        ))}
+                        </div>
 
-                        {subjects.length > 3 && (
-                          <span className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700">
-                            +{subjects.length - 3} more
-                          </span>
-                        )}
+                        <p className="mt-2 text-2xl font-black text-indigo-700">
+                          {subjects.length}
+                        </p>
                       </div>
-                    ) : (
-                      <p className="text-xs text-slate-400">
-                        Subjects will be available soon.
+
+                      <div className="rounded-xl bg-emerald-50 p-3">
+                        <div className="flex items-center gap-2 text-emerald-600">
+                          <BookMarked size={17} />
+                          <span className="text-xs font-bold">
+                            Chapters
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-2xl font-black text-emerald-700">
+                          {chapterCount}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5">
+                      <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                        Available Subjects
                       </p>
-                    )}
-                  </div>
 
-                  {/* CARD FOOTER */}
-                  <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
-                    <span className="flex items-center gap-2 text-sm font-bold text-indigo-700">
-                      <BookOpen size={17} />
-                      Explore Class
-                    </span>
+                      {subjects.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {subjects.slice(0, 4).map((subject) => (
+                            <span
+                              key={subject}
+                              className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600"
+                            >
+                              {subject}
+                            </span>
+                          ))}
 
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-700 transition group-hover:bg-indigo-600 group-hover:text-white">
-                      <ArrowRight size={18} />
-                    </span>
+                          {subjects.length > 4 && (
+                            <span className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700">
+                              +{subjects.length - 4} more
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400">
+                          Subjects will be available soon.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-6 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
+                      <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-800">
+                        <Crown size={15} />
+                        {membership?.plan || "Premium"} Membership
+                      </div>
+
+                      <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald-700">
+                        <Clock3 size={13} />
+                        Valid till {formatDate(membership?.expiresAt)}
+                      </p>
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+                      <span className="flex items-center gap-2 text-sm font-extrabold text-indigo-700">
+                        Explore Class
+                      </span>
+
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-700 transition group-hover:bg-indigo-600 group-hover:text-white">
+                        <ArrowRight size={18} />
+                      </span>
+                    </div>
                   </div>
                 </Link>
               );
             })}
-
           </div>
         )}
+
+        {/* Learning information */}
+        <div className="mt-9 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <BookOpen className="text-indigo-600" size={23} />
+            <h3 className="mt-3 font-extrabold text-slate-900">
+              Chapter-wise Learning
+            </h3>
+            <p className="mt-2 text-xs leading-6 text-slate-500">
+              Har subject ke chapters ko step-by-step explore karein.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <Library className="text-emerald-600" size={23} />
+            <h3 className="mt-3 font-extrabold text-slate-900">
+              Study Resources
+            </h3>
+            <p className="mt-2 text-xs leading-6 text-slate-500">
+              Written notes, video lectures aur handwritten material.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <Crown className="text-amber-500" size={23} />
+            <h3 className="mt-3 font-extrabold text-slate-900">
+              Membership Benefits
+            </h3>
+            <p className="mt-2 text-xs leading-6 text-slate-500">
+              Apni active class ke Premium learning resources access karein.
+            </p>
+          </div>
+        </div>
       </section>
     </main>
   );

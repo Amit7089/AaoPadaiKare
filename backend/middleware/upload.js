@@ -5,21 +5,26 @@ import path from "path";
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
+  const extension = path.extname(file.originalname).toLowerCase();
+
   if (
-    file.mimetype === "application/pdf" &&
-    path.extname(file.originalname).toLowerCase() === ".pdf"
+    file.mimetype !== "application/pdf" ||
+    extension !== ".pdf"
   ) {
-    cb(null, true);
-  } else {
-    cb(new Error("Only PDF files are allowed"));
+    return cb(new Error("Only PDF files are allowed"));
   }
+
+  cb(null, true);
 };
 
 const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024,
+    fileSize: 10 * 1024 * 1024, // 10 MB
+    files: 1,
+    fields: 10,
+    parts: 12,
   },
 });
 

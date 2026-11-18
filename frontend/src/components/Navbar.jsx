@@ -15,6 +15,7 @@ import {
   UserPlus,
   UserCircle,
   LogOut,
+  FileText,
 } from "lucide-react";
 
 import {
@@ -24,22 +25,26 @@ import {
   clearStudentToken,
 } from "../services/api";
 
+// PUBLIC NAVIGATION
 const publicLinks = [
   { label: "Home", to: "/" },
   { label: "Classes", to: "/classes" },
   { label: "Notes", to: "/notes" },
+  { label: "Question Papers", to: "/question-papers", icon: FileText },
   { label: "Quiz", to: "/quiz" },
 ];
 
+// STUDENT NAVIGATION
 const studentLinks = [
   { label: "Home", to: "/" },
   { label: "Classes", to: "/classes" },
   { label: "Notes", to: "/notes" },
+  { label: "Question Papers", to: "/question-papers", icon: FileText },
   { label: "Quiz", to: "/quiz" },
   { label: "Dashboard", to: "/dashboard" },
-  { label: "My Profile", to: "/student/profile" },
 ];
 
+// ADMIN NAVIGATION
 const adminLinks = [
   { label: "Home", to: "/" },
   { label: "Admin Panel", to: "/admin/dashboard" },
@@ -47,6 +52,7 @@ const adminLinks = [
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+
   const [auth, setAuth] = useState({
     role: "guest",
     loggedIn: false,
@@ -55,28 +61,39 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // CHECK AUTHENTICATION
   const checkAuth = () => {
     const adminToken = getAdminToken();
     const studentToken = getStudentToken();
 
     if (adminToken) {
-      setAuth({ role: "admin", loggedIn: true });
+      setAuth({
+        role: "admin",
+        loggedIn: true,
+      });
     } else if (studentToken) {
-      setAuth({ role: "student", loggedIn: true });
+      setAuth({
+        role: "student",
+        loggedIn: true,
+      });
     } else {
-      setAuth({ role: "guest", loggedIn: false });
+      setAuth({
+        role: "guest",
+        loggedIn: false,
+      });
     }
   };
 
+  // UPDATE AUTH WHEN ROUTE CHANGES
   useEffect(() => {
     checkAuth();
     setMenuOpen(false);
   }, [location.pathname]);
 
+  // LISTEN FOR LOGIN / LOGOUT EVENTS
   useEffect(() => {
     const handleStorage = () => checkAuth();
 
-    // Same-tab login/logout updates
     window.addEventListener("storage", handleStorage);
     window.addEventListener("authChange", handleStorage);
 
@@ -86,6 +103,7 @@ export default function Navbar() {
     };
   }, []);
 
+  // LOGOUT
   const handleLogout = () => {
     if (auth.role === "admin") {
       clearAdminToken();
@@ -101,16 +119,19 @@ export default function Navbar() {
     });
 
     setMenuOpen(false);
+
     navigate("/login", { replace: true });
   };
 
+  // SELECT NAVIGATION
   const links =
     auth.role === "admin"
       ? adminLinks
       : auth.role === "student"
-      ? studentLinks
-      : publicLinks;
+        ? studentLinks
+        : publicLinks;
 
+  // NAVIGATION LINK STYLE
   const linkClass = ({ isActive }) =>
     `rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
       isActive
@@ -118,7 +139,9 @@ export default function Navbar() {
         : "text-slate-600 hover:bg-slate-50 hover:text-indigo-700"
     }`;
 
+  // AUTHENTICATION BUTTONS
   const renderAuthButtons = () => {
+    // GUEST
     if (auth.role === "guest") {
       return (
         <>
@@ -143,6 +166,7 @@ export default function Navbar() {
       );
     }
 
+    // STUDENT
     if (auth.role === "student") {
       return (
         <>
@@ -166,6 +190,7 @@ export default function Navbar() {
       );
     }
 
+    // ADMIN
     return (
       <button
         onClick={handleLogout}
@@ -181,7 +206,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
       <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
 
-        {/* Logo */}
+        {/* LOGO */}
         <Link
           to="/"
           onClick={() => setMenuOpen(false)}
@@ -202,7 +227,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* Desktop Navigation */}
+        {/* DESKTOP NAVIGATION */}
         <div className="hidden items-center gap-1 lg:flex">
           {links.map((link) => (
             <NavLink
@@ -216,16 +241,20 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* Desktop Authentication */}
+        {/* DESKTOP AUTHENTICATION */}
         <div className="hidden shrink-0 items-center gap-2 md:flex">
           {renderAuthButtons()}
         </div>
 
-        {/* Mobile Menu Button */}
+        {/* MOBILE MENU BUTTON */}
         <button
           type="button"
           onClick={() => setMenuOpen((previous) => !previous)}
-          aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-label={
+            menuOpen
+              ? "Close navigation menu"
+              : "Open navigation menu"
+          }
           aria-expanded={menuOpen}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 md:hidden"
         >
@@ -233,10 +262,12 @@ export default function Navbar() {
         </button>
       </nav>
 
-      {/* Mobile Navigation */}
+      {/* MOBILE NAVIGATION */}
       {menuOpen && (
         <div className="border-t border-slate-100 bg-white px-4 py-4 shadow-lg md:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-2">
+
+            {/* NAVIGATION LINKS */}
             {links.map((link) => (
               <NavLink
                 key={link.to}
@@ -249,7 +280,14 @@ export default function Navbar() {
               </NavLink>
             ))}
 
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            {/* AUTH BUTTONS */}
+            <div
+              className={`mt-3 grid gap-2 ${
+                auth.role === "admin"
+                  ? "grid-cols-1"
+                  : "grid-cols-2"
+              }`}
+            >
               {renderAuthButtons()}
             </div>
           </div>
